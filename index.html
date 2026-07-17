@@ -14,8 +14,8 @@
   :root {
     --bg: #FFF6E9;
     --card: #FFFFFF;
-    --ink: #3A2E2C;
-    --sub: #9A8880;
+    --ink: #2A1D1B;
+    --sub: #6E5F57;
     --line: #F2E6D8;
     --coral: #FF6B4A;
     --coral-soft: #FFE4DB;
@@ -36,6 +36,7 @@
     margin: 0; background: var(--bg); color: var(--ink);
     font-family: "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN", -apple-system, sans-serif;
     font-size: 16px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
   }
   .app { max-width: 640px; margin: 0 auto; padding: 0 14px calc(96px + env(safe-area-inset-bottom)); }
   header {
@@ -114,8 +115,10 @@
   .cal th { font-size: 11px; color: var(--sub); font-weight: 600; padding: 4px 0; }
   .cal td { vertical-align: top; height: 58px; padding: 2px 1px; cursor: pointer; border-radius: 10px; }
   .cal td:active { background: var(--coral-soft); }
-  .cal .dnum { font-size: 12px; text-align: center; width: 22px; height: 22px; line-height: 22px; border-radius: 50%; margin: 0 auto 1px; }
-  .cal td.today .dnum { background: var(--coral); color: #fff; font-weight: 600; }
+  .cal .dnum { font-size: 12px; text-align: center; width: 22px; height: 22px; line-height: 22px; border-radius: 50%; margin: 0 auto 1px; font-weight: 600; }
+  .cal th.sun, .cal td.sun .dnum { color: #E05B4B; }
+  .cal th.sat, .cal td.sat .dnum { color: #2980D9; }
+  .cal td.today .dnum { background: var(--coral); color: #fff; }
   .cal .m { font-size: 10px; line-height: 1.25; color: var(--teal-deep); text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .cal .more { font-size: 9px; color: var(--sub); text-align: center; }
 
@@ -327,7 +330,9 @@ function renderToday() {
   const anyToday = activeSlots().some(s => planOf(t, s).length > 0);
   let h = exportBanner();
   h += '<div class="card" onclick="openDaySheet(\'' + t + '\')" style="cursor:pointer; border: 2.5px solid var(--coral); background: linear-gradient(0deg, var(--card), var(--card));">';
-  h += '<div class="muted" style="font-weight:600; color:var(--coral-deep);">🍽 今日のごはん ・ ' + fullLabel(t) + '</div>';
+  h += '<div class="row"><div class="muted grow" style="font-weight:600; color:var(--coral-deep);">🍽 今日のごはん ・ ' + fullLabel(t) + '</div>';
+  if (anyToday) h += '<button class="navbtn" style="flex-shrink:0;" onclick="event.stopPropagation(); shareToday()" aria-label="今日の献立を共有">📤</button>';
+  h += '</div>';
   if (anyToday) h += slotLinesHtml(t, true);
   else h += '<div class="muted" style="margin-top:4px;">まだ決まっていません。タップして決めましょう</div>';
   h += '</div>';
@@ -376,14 +381,16 @@ function calHtml(y, m) {
   const sun = settings.weekStart === 'sunday';
   const lead = sun ? first.getDay() : (first.getDay() + 6) % 7;
   const heads = sun ? [0,1,2,3,4,5,6] : [1,2,3,4,5,6,0];
-  let h = '<table class="cal"><tr>' + heads.map(d => '<th>' + DOWJP[d] + '</th>').join('') + '</tr><tr>';
+  let h = '<table class="cal"><tr>' + heads.map(d => '<th class="' + (d === 0 ? 'sun' : d === 6 ? 'sat' : '') + '">' + DOWJP[d] + '</th>').join('') + '</tr><tr>';
   let col = 0;
   for (let i = 0; i < lead; i++) { h += '<td></td>'; col++; }
   for (let day = 1; day <= dim; day++) {
     const ds = y + '-' + pad(m) + '-' + pad(day);
     const names = [];
     activeSlots().forEach(s => planOf(ds, s).forEach(id => names.push(recipeName(id))));
-    h += '<td class="' + (ds === t ? 'today' : '') + '" onclick="openDaySheet(\'' + ds + '\')"><div class="dnum">' + day + '</div>';
+    const dow = dowOf(ds);
+    const cls = (ds === t ? 'today ' : '') + (dow === 0 ? 'sun' : dow === 6 ? 'sat' : '');
+    h += '<td class="' + cls + '" onclick="openDaySheet(\'' + ds + '\')"><div class="dnum">' + day + '</div>';
     names.slice(0, 2).forEach(n => h += '<div class="m">' + esc(n) + '</div>');
     if (names.length > 2) h += '<div class="more">+' + (names.length - 2) + '</div>';
     h += '</td>';
@@ -745,6 +752,21 @@ function copyShopping() {
   });
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => alert('コピーしました')).catch(() => prompt('コピーしてください', text));
+  } else prompt('コピーしてください', text);
+}
+
+function shareToday() {
+  const t = todayStr();
+  const lines = [];
+  activeSlots().forEach(slot => {
+    const ids = planOf(t, slot);
+    if (ids.length) lines.push((activeSlots().length > 1 ? SLOTNAME[slot] + '：' : '') + ids.map(recipeName).join('、'));
+  });
+  const text = '【' + fullLabel(t) + 'の献立】\n' + lines.join('\n');
+  if (navigator.share) {
+    navigator.share({ text }).catch(() => {});
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => alert('コピーしました。LINEなどに貼り付けてください')).catch(() => prompt('コピーしてください', text));
   } else prompt('コピーしてください', text);
 }
 
