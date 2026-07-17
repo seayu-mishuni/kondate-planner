@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="こんだて">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<title>献立プランナー</title>
+<style>
+  :root {
+    --bg: #FFF6E9;
+    --card: #FFFFFF;
+    --ink: #3A2E2C;
+    --sub: #9A8880;
+    --line: #F2E6D8;
+    --coral: #FF6B4A;
+    --coral-soft: #FFE4DB;
+    --coral-deep: #C23E22;
+    --teal: #00A896;
+    --teal-soft: #D6F2EC;
+    --teal-deep: #056459;
+    --yellow: #FFC53D;
+    --yellow-soft: #FFF0CC;
+    --yellow-deep: #8A5F00;
+    --purple: #8B7BF4;
+    --purple-soft: #E9E5FD;
+    --purple-deep: #4A3DA8;
+    --shadow: 0 2px 10px rgba(90, 60, 40, .08);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN", -apple-system, sans-serif;
+    font-size: 16px; line-height: 1.5;
+  }
+  .app { max-width: 640px; margin: 0 auto; padding: 0 14px calc(96px + env(safe-area-inset-bottom)); }
+  header {
+    position: sticky; top: 0; z-index: 5; background: var(--bg);
+    display: flex; align-items: center; justify-content: space-between;
+    max-width: 640px; margin: 0 auto; padding: calc(12px + env(safe-area-inset-top)) 16px 8px;
+  }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
+  header h1 .dot { color: var(--coral); }
+  .gear { border: none; background: var(--card); border-radius: 50%; width: 38px; height: 38px; font-size: 18px; box-shadow: var(--shadow); cursor: pointer; }
+
+  nav {
+    position: fixed; bottom: calc(10px + env(safe-area-inset-bottom)); left: 0; right: 0; margin: 0 auto;
+    width: calc(100% - 24px); max-width: 480px; z-index: 20;
+    display: flex; background: var(--card); border-radius: 26px; box-shadow: 0 4px 18px rgba(90,60,40,.16); padding: 6px;
+  }
+  nav button {
+    flex: 1; border: none; background: none; font-family: inherit; cursor: pointer;
+    font-size: 11px; color: var(--sub); padding: 6px 0 5px; border-radius: 20px; line-height: 1.2;
+  }
+  nav button .ico { display: block; font-size: 20px; margin-bottom: 1px; }
+  nav button.on { background: var(--coral-soft); color: var(--coral-deep); font-weight: 600; }
+
+  .card { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); padding: 14px 16px; margin-bottom: 14px; }
+  .muted { color: var(--sub); font-size: 13px; }
+  .sec-title { font-size: 14px; color: var(--sub); margin: 18px 4px 8px; font-weight: 600; }
+
+  .btn {
+    display: inline-block; border: none; font-family: inherit; cursor: pointer;
+    background: var(--coral); color: #fff; font-size: 15px; font-weight: 600;
+    padding: 11px 20px; border-radius: 999px;
+  }
+  .btn.ghost { background: var(--card); color: var(--coral-deep); border: 1.5px solid var(--coral); font-weight: 600; }
+  .btn.teal { background: var(--teal); }
+  .btn.wide { display: block; width: 100%; text-align: center; }
+  .btn.sm { font-size: 13px; padding: 8px 14px; }
+  .btn.danger { background: #fff; color: #C0392B; border: 1.5px solid #E74C3C; }
+
+  .chip {
+    display: inline-block; font-size: 13px; padding: 5px 12px; border-radius: 999px;
+    background: var(--teal-soft); color: var(--teal-deep); margin: 2px 4px 2px 0; cursor: pointer; font-weight: 600;
+  }
+  .chip.ghost { background: none; border: 1.5px dashed var(--sub); color: var(--sub); font-weight: 400; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 999px; font-weight: 600; vertical-align: 1px; }
+  .b-main { background: var(--coral-soft); color: var(--coral-deep); }
+  .b-side { background: var(--teal-soft); color: var(--teal-deep); }
+  .b-soup { background: var(--purple-soft); color: var(--purple-deep); }
+  .b-bowl { background: var(--yellow-soft); color: var(--yellow-deep); }
+  .b-etc  { background: #EFEBE6; color: #6B5F58; }
+
+  input[type=text], input[type=search], input[type=number], select, textarea {
+    font-family: inherit; font-size: 16px; color: var(--ink);
+    border: 1.5px solid var(--line); border-radius: 12px; background: #FFFDFA;
+    padding: 10px 12px; width: 100%; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--coral); }
+  label.f { display: block; font-size: 13px; color: var(--sub); margin: 14px 2px 4px; font-weight: 600; }
+
+  .row { display: flex; align-items: center; gap: 8px; }
+  .grow { flex: 1; min-width: 0; }
+
+  .weeknav { display: flex; align-items: center; justify-content: space-between; margin: 4px 2px 12px; }
+  .weeknav b { font-size: 16px; }
+  .navbtn { border: none; background: var(--card); box-shadow: var(--shadow); border-radius: 50%; width: 34px; height: 34px; font-size: 15px; cursor: pointer; color: var(--ink); }
+
+  .dayrow { display: flex; gap: 10px; padding: 10px 2px; border-bottom: 1.5px dashed var(--line); }
+  .dayrow:last-child { border-bottom: none; }
+  .dayrow.today { background: var(--yellow-soft); border-radius: 14px; padding: 10px 8px; }
+  .daylabel { width: 46px; flex-shrink: 0; text-align: center; font-size: 13px; color: var(--sub); line-height: 1.3; padding-top: 3px; }
+  .daylabel b { display: block; font-size: 16px; color: var(--ink); }
+  .daylabel .sat { color: #2980D9; } .daylabel .sun { color: #E05B4B; }
+  .slotline { margin: 1px 0; }
+  .slotname { font-size: 11px; color: var(--sub); margin-right: 4px; }
+
+  .cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .cal th { font-size: 11px; color: var(--sub); font-weight: 600; padding: 4px 0; }
+  .cal td { vertical-align: top; height: 58px; padding: 2px 1px; cursor: pointer; border-radius: 10px; }
+  .cal td:active { background: var(--coral-soft); }
+  .cal .dnum { font-size: 12px; text-align: center; width: 22px; height: 22px; line-height: 22px; border-radius: 50%; margin: 0 auto 1px; }
+  .cal td.today .dnum { background: var(--coral); color: #fff; font-weight: 600; }
+  .cal .m { font-size: 10px; line-height: 1.25; color: var(--teal-deep); text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .cal .more { font-size: 9px; color: var(--sub); text-align: center; }
+
+  .listrow { padding: 11px 2px; border-bottom: 1.5px solid var(--line); cursor: pointer; }
+  .listrow:last-child { border-bottom: none; }
+
+  .seg { display: flex; background: #F4EBDE; border-radius: 999px; padding: 3px; margin-bottom: 14px; }
+  .seg button { flex: 1; border: none; background: none; font-family: inherit; font-size: 14px; padding: 8px 0; border-radius: 999px; color: var(--sub); cursor: pointer; }
+  .seg button.on { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: var(--shadow); }
+
+  .fab {
+    position: fixed; right: calc(50% - min(50%, 320px) + 18px); bottom: calc(78px + env(safe-area-inset-bottom)); z-index: 15;
+    width: 54px; height: 54px; border-radius: 50%; border: none; background: var(--coral); color: #fff;
+    font-size: 28px; line-height: 1; box-shadow: 0 4px 14px rgba(255,107,74,.45); cursor: pointer;
+  }
+
+  .check { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1.5px solid var(--line); cursor: pointer; }
+  .check:last-child { border-bottom: none; }
+  .cbox { width: 24px; height: 24px; flex-shrink: 0; border-radius: 8px; border: 2px solid #D8C9B8; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px; font-weight: 700; }
+  .check.done .cbox { background: var(--teal); border-color: var(--teal); }
+  .check.done .nm { color: var(--sub); text-decoration: line-through; }
+  .qty { margin-left: auto; font-size: 13px; color: var(--sub); flex-shrink: 0; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(58,46,44,.4); z-index: 30; display: none; }
+  .overlay.show { display: block; }
+  .sheet {
+    position: fixed; left: 0; right: 0; margin: 0 auto; bottom: 0; width: 100%; max-width: 640px; z-index: 31;
+    background: var(--card); border-radius: 24px 24px 0 0; padding: 18px 18px calc(20px + env(safe-area-inset-bottom));
+    max-height: 78vh; overflow-y: auto; display: none;
+  }
+  .sheet.show { display: block; }
+  .sheet h3 { margin: 0 0 12px; font-size: 17px; }
+  .grabber { width: 40px; height: 5px; background: var(--line); border-radius: 3px; margin: -6px auto 12px; }
+
+  .modal { position: fixed; inset: 0; z-index: 40; background: var(--bg); overflow-y: auto; display: none; }
+  .modal.show { display: block; }
+  .modal .inner { max-width: 640px; margin: 0 auto; padding: 14px 16px calc(30px + env(safe-area-inset-bottom)); }
+  .modal .mhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .modal .mhead h2 { font-size: 18px; margin: 0; }
+  .xbtn { border: none; background: var(--card); border-radius: 50%; width: 34px; height: 34px; font-size: 16px; box-shadow: var(--shadow); cursor: pointer; }
+
+  .ingrow { display: flex; gap: 6px; margin-bottom: 8px; }
+  .ingrow input.nm { flex: 2.2; min-width: 0; }
+  .ingrow input.qt { flex: 1; min-width: 0; }
+  .ingrow input.un { flex: 1; min-width: 0; }
+  .delrow { border: none; background: none; color: var(--sub); font-size: 17px; cursor: pointer; padding: 0 2px; }
+
+  .banner { background: var(--yellow-soft); color: var(--yellow-deep); border-radius: 16px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; }
+  .banner b { cursor: pointer; text-decoration: underline; }
+  .empty { text-align: center; color: var(--sub); font-size: 14px; padding: 26px 10px; }
+  .empty .big { font-size: 34px; display: block; margin-bottom: 6px; }
+  h2.pagetitle { font-size: 17px; margin: 10px 4px 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>献立プランナー<span class="dot">●</span></h1>
+  <button class="gear" onclick="openSettings()" aria-label="設定">⚙️</button>
+</header>
+<div class="app" id="view"></div>
+
+<nav>
+  <button id="nav-today" onclick="switchTab('today')"><span class="ico">📅</span>カレンダー</button>
+  <button id="nav-plan" onclick="switchTab('plan')"><span class="ico">🗓</span>プラン</button>
+  <button id="nav-recipes" onclick="switchTab('recipes')"><span class="ico">🍳</span>献立</button>
+  <button id="nav-shopping" onclick="switchTab('shopping')"><span class="ico">🛒</span>買物</button>
+</nav>
+
+<div class="overlay" id="overlay" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet"></div>
+<div class="modal" id="modal"></div>
+<datalist id="ing-list"></datalist>
+<input type="file" id="import-file" accept="application/json" style="display:none;" onchange="importData(event)">
+
+<script>
+const store = {
+  get(key, fallback) {
+    try {
+      const v = localStorage.getItem(key);
+      return v ? JSON.parse(v) : fallback;
+    } catch (e) { return fallback; }
+  },
+  set(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+};
+
+const RCPCATS = ['主菜', '副菜', '汁物', '丼・麺', 'その他'];
+const CATBADGE = { '主菜': 'b-main', '副菜': 'b-side', '汁物': 'b-soup', '丼・麺': 'b-bowl', 'その他': 'b-etc' };
+const SLOTDEFS = [ ['breakfast','朝食'], ['lunch','昼食'], ['dinner','夕食'] ];
+const SLOTNAME = { breakfast: '朝食', lunch: '昼食', dinner: '夕食' };
+const DOWJP = ['日','月','火','水','木','金','土'];
+
+let recipes = store.get('kondate_recipes', []);
+let mealPlan = store.get('kondate_mealPlan', {});
+let checks = store.get('kondate_shoppingChecks', {});
+let settings = Object.assign({ slots: ['dinner'], weekStart: 'monday', lastExport: null }, store.get('kondate_settings', {}));
+
+function saveRcp() { store.set('kondate_recipes', recipes); }
+function savePlan() { store.set('kondate_mealPlan', mealPlan); }
+function saveChecks() { store.set('kondate_shoppingChecks', checks); }
+function saveSettings() { store.set('kondate_settings', settings); }
+
+function inlineIngredientRefs(recipeList, masterList) {
+  const map = {};
+  (masterList || []).forEach(i => { map[i.id] = i; });
+  recipeList.forEach(r => (r.ingredients || []).forEach(l => {
+    if (l.ingredientId) {
+      const m = map[l.ingredientId];
+      if (m) { l.name = m.name; if (!l.unit && m.defaultUnit) l.unit = m.defaultUnit; }
+      delete l.ingredientId;
+    }
+  }));
+}
+(function migrateFromMaster() {
+  const olds = store.get('kondate_ingredients', null);
+  if (olds && olds.length) { inlineIngredientRefs(recipes, olds); saveRcp(); }
+  localStorage.removeItem('kondate_ingredients');
+})();
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function pad(n) { return String(n).padStart(2, '0'); }
+function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function todayStr() { return ymd(new Date()); }
+function toDate(ds) { return new Date(ds + 'T00:00:00'); }
+function addDays(ds, n) { const d = toDate(ds); d.setDate(d.getDate() + n); return ymd(d); }
+function dowOf(ds) { return toDate(ds).getDay(); }
+function mdLabel(ds) { const d = toDate(ds); return (d.getMonth() + 1) + '/' + d.getDate(); }
+function fullLabel(ds) { const d = toDate(ds); return (d.getMonth() + 1) + '月' + d.getDate() + '日（' + DOWJP[d.getDay()] + '）'; }
+function weekStartOf(ds) {
+  const dow = dowOf(ds);
+  const offset = settings.weekStart === 'sunday' ? dow : (dow + 6) % 7;
+  return addDays(ds, -offset);
+}
+function diffDays(a, b) { return Math.round((toDate(b) - toDate(a)) / 86400000); }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function activeSlots() { return SLOTDEFS.map(s => s[0]).filter(k => settings.slots.includes(k)); }
+
+function recipeById(id) { return recipes.find(r => r.id === id); }
+function recipeName(id) { const r = recipeById(id); return r ? r.name : '（削除済み）'; }
+function ingredientNames() {
+  const set = new Set();
+  recipes.forEach(r => (r.ingredients || []).forEach(l => { if (l.name) set.add(l.name); }));
+  return [...set].sort((a, b) => a.localeCompare(b, 'ja'));
+}
+function planOf(ds, slot) { return (mealPlan[ds] && mealPlan[ds][slot]) || []; }
+
+function lastCooked(recipeId) {
+  const t = todayStr();
+  let best = null;
+  for (const ds in mealPlan) {
+    if (ds > t) continue;
+    const day = mealPlan[ds];
+    for (const slot in day) {
+      if (day[slot].includes(recipeId) && (!best || ds > best)) best = ds;
+    }
+  }
+  return best;
+}
+function lastCookedLabel(recipeId) {
+  const d = lastCooked(recipeId);
+  if (!d) return 'まだ作ってない';
+  const n = diffDays(d, todayStr());
+  return n === 0 ? '今日' : n + '日前';
+}
+
+let activeTab = 'today';
+function switchTab(t) {
+  activeTab = t;
+  ['today','plan','recipes','shopping'].forEach(k => {
+    document.getElementById('nav-' + k).classList.toggle('on', k === t);
+  });
+  render();
+}
+function render() {
+  closeSheet();
+  if (activeTab === 'today') renderToday();
+  else if (activeTab === 'plan') renderPlan();
+  else if (activeTab === 'recipes') renderRecipes();
+  else renderShopping();
+}
+
+/* ---------- 今日／カレンダー ---------- */
+let calCur = todayStr().slice(0, 7);
+let calMode = 'week';
+let calWS = null;
+
+function exportBanner() {
+  const hasData = recipes.length > 0 || Object.keys(mealPlan).length > 0;
+  if (!hasData) return '';
+  if (settings.lastExport && diffDays(settings.lastExport, todayStr()) <= 30) return '';
+  return '<div class="banner">📦 データは端末内のみに保存されます。' + (settings.lastExport ? '最後のバックアップから30日以上経っています。' : 'まだ一度もバックアップしていません。') + '<b onclick="openSettings()">設定からエクスポート</b>できます。</div>';
+}
+
+function slotLinesHtml(ds, compactEmpty) {
+  let h = '';
+  activeSlots().forEach(slot => {
+    const ids = planOf(ds, slot);
+    if (ids.length === 0 && compactEmpty) return;
+    h += '<div class="slotline">';
+    if (activeSlots().length > 1) h += '<span class="slotname">' + SLOTNAME[slot] + '</span>';
+    if (ids.length === 0) h += '<span class="muted">未定</span>';
+    else h += ids.map(id => '<span class="chip">' + esc(recipeName(id)) + '</span>').join('');
+    h += '</div>';
+  });
+  return h;
+}
+
+function renderToday() {
+  const t = todayStr();
+  const anyToday = activeSlots().some(s => planOf(t, s).length > 0);
+  let h = exportBanner();
+  h += '<div class="card" onclick="openDaySheet(\'' + t + '\')" style="cursor:pointer; border: 2.5px solid var(--coral); background: linear-gradient(0deg, var(--card), var(--card));">';
+  h += '<div class="muted" style="font-weight:600; color:var(--coral-deep);">🍽 今日のごはん ・ ' + fullLabel(t) + '</div>';
+  if (anyToday) h += slotLinesHtml(t, true);
+  else h += '<div class="muted" style="margin-top:4px;">まだ決まっていません。タップして決めましょう</div>';
+  h += '</div>';
+
+  h += '<div class="seg"><button class="' + (calMode === 'week' ? 'on' : '') + '" onclick="calMode=\'week\'; renderToday()">週表示</button><button class="' + (calMode === 'month' ? 'on' : '') + '" onclick="calMode=\'month\'; renderToday()">月表示</button></div>';
+
+  h += calMode === 'week' ? weekCalHtml() : monthCalHtml();
+  document.getElementById('view').innerHTML = h;
+}
+function weekCalHtml() {
+  if (!calWS) calWS = weekStartOf(todayStr());
+  const t = todayStr();
+  const end = addDays(calWS, 6);
+  let h = '<div class="card">';
+  h += '<div class="weeknav"><button class="navbtn" onclick="moveCalWeek(-1)">◀</button><b>' + mdLabel(calWS) + '（' + DOWJP[dowOf(calWS)] + '）〜 ' + mdLabel(end) + '（' + DOWJP[dowOf(end)] + '）</b><button class="navbtn" onclick="moveCalWeek(1)">▶</button></div>';
+  for (let i = 0; i < 7; i++) {
+    const ds = addDays(calWS, i);
+    const dow = dowOf(ds);
+    h += '<div class="dayrow' + (ds === t ? ' today' : '') + '" style="cursor:pointer;" onclick="openDaySheet(\'' + ds + '\')">';
+    h += '<div class="daylabel"><span class="' + (dow === 0 ? 'sun' : dow === 6 ? 'sat' : '') + '">' + DOWJP[dow] + '</span><b>' + toDate(ds).getDate() + '</b></div>';
+    h += '<div class="grow">' + (slotLinesHtml(ds, true) || '<span class="muted">未定</span>') + '</div></div>';
+  }
+  h += '</div>';
+  return h;
+}
+function monthCalHtml() {
+  const [y, m] = calCur.split('-').map(Number);
+  let h = '<div class="card">';
+  h += '<div class="weeknav"><button class="navbtn" onclick="moveCal(-1)">◀</button><b>' + y + '年' + m + '月</b><button class="navbtn" onclick="moveCal(1)">▶</button></div>';
+  h += calHtml(y, m);
+  h += '<div class="muted" style="margin-top:8px; text-align:center;">日付タップで内容を表示（登録はプランから）</div></div>';
+  return h;
+}
+function moveCalWeek(n) { calWS = addDays(calWS, n * 7); renderToday(); }
+function moveCal(n) {
+  let [y, m] = calCur.split('-').map(Number);
+  m += n;
+  if (m === 0) { m = 12; y--; } if (m === 13) { m = 1; y++; }
+  calCur = y + '-' + pad(m);
+  renderToday();
+}
+function calHtml(y, m) {
+  const t = todayStr();
+  const first = toDate(y + '-' + pad(m) + '-01');
+  const dim = new Date(y, m, 0).getDate();
+  const sun = settings.weekStart === 'sunday';
+  const lead = sun ? first.getDay() : (first.getDay() + 6) % 7;
+  const heads = sun ? [0,1,2,3,4,5,6] : [1,2,3,4,5,6,0];
+  let h = '<table class="cal"><tr>' + heads.map(d => '<th>' + DOWJP[d] + '</th>').join('') + '</tr><tr>';
+  let col = 0;
+  for (let i = 0; i < lead; i++) { h += '<td></td>'; col++; }
+  for (let day = 1; day <= dim; day++) {
+    const ds = y + '-' + pad(m) + '-' + pad(day);
+    const names = [];
+    activeSlots().forEach(s => planOf(ds, s).forEach(id => names.push(recipeName(id))));
+    h += '<td class="' + (ds === t ? 'today' : '') + '" onclick="openDaySheet(\'' + ds + '\')"><div class="dnum">' + day + '</div>';
+    names.slice(0, 2).forEach(n => h += '<div class="m">' + esc(n) + '</div>');
+    if (names.length > 2) h += '<div class="more">+' + (names.length - 2) + '</div>';
+    h += '</td>';
+    col++;
+    if (col === 7 && day < dim) { h += '</tr><tr>'; col = 0; }
+  }
+  while (col > 0 && col < 7) { h += '<td></td>'; col++; }
+  return h + '</tr></table>';
+}
+
+function openDaySheet(ds) {
+  let h = '<div class="grabber"></div><h3>' + fullLabel(ds) + '</h3>';
+  activeSlots().forEach(slot => {
+    const ids = planOf(ds, slot);
+    h += '<div style="margin-bottom:12px;"><div class="muted" style="font-weight:600; margin-bottom:4px;">' + SLOTNAME[slot] + '</div>';
+    if (ids.length === 0) h += '<span class="muted">未定</span>';
+    else ids.forEach(id => { h += '<span class="chip">' + esc(recipeName(id)) + '</span>'; });
+    h += '</div>';
+  });
+  h += '<button class="btn wide" onclick="planWS = weekStartOf(\'' + ds + '\'); switchTab(\'plan\')">🗓 この週のプランで編集</button>';
+  openSheet(h);
+}
+
+/* ---------- 週間プラン ---------- */
+let planWS = null;
+function renderPlan() {
+  if (!planWS) planWS = weekStartOf(todayStr());
+  const t = todayStr();
+  const end = addDays(planWS, 6);
+  let h = '<div class="weeknav"><button class="navbtn" onclick="movePlanWeek(-1)">◀</button><b>' + mdLabel(planWS) + '（' + DOWJP[dowOf(planWS)] + '）〜 ' + mdLabel(end) + '（' + DOWJP[dowOf(end)] + '）</b><button class="navbtn" onclick="movePlanWeek(1)">▶</button></div>';
+  h += '<div class="card">';
+  for (let i = 0; i < 7; i++) {
+    const ds = addDays(planWS, i);
+    const dow = dowOf(ds);
+    h += '<div class="dayrow' + (ds === t ? ' today' : '') + '">';
+    h += '<div class="daylabel"><span class="' + (dow === 0 ? 'sun' : dow === 6 ? 'sat' : '') + '">' + DOWJP[dow] + '</span><b>' + toDate(ds).getDate() + '</b></div>';
+    h += '<div class="grow">';
+    activeSlots().forEach(slot => {
+      const ids = planOf(ds, slot);
+      h += '<div class="slotline">';
+      if (activeSlots().length > 1) h += '<span class="slotname">' + SLOTNAME[slot] + '</span>';
+      ids.forEach((id, idx) => {
+        h += '<span class="chip" onclick="chipMenu(\'' + ds + '\',\'' + slot + '\',' + idx + ')">' + esc(recipeName(id)) + '</span>';
+      });
+      h += '<span class="chip ghost" onclick="openPicker(\'' + ds + '\',\'' + slot + '\')">＋</span></div>';
+    });
+    h += '</div></div>';
+  }
+  h += '</div>';
+  h += '<button class="btn ghost wide" onclick="copyLastWeek()">📋 先週の献立をコピー</button>';
+  h += '<div style="height:10px;"></div><button class="btn teal wide" onclick="goShoppingWeek()">🛒 この週の買い物リストを見る</button>';
+  document.getElementById('view').innerHTML = h;
+}
+function movePlanWeek(n) { planWS = addDays(planWS, n * 7); renderPlan(); }
+function goShoppingWeek() { shopWS = planWS; switchTab('shopping'); }
+
+function copyLastWeek() {
+  let copied = 0;
+  for (let i = 0; i < 7; i++) {
+    const dst = addDays(planWS, i), src = addDays(planWS, i - 7);
+    activeSlots().forEach(slot => {
+      planOf(src, slot).forEach(id => {
+        if (!recipeById(id) || recipeById(id).archived) return;
+        if (!mealPlan[dst]) mealPlan[dst] = {};
+        if (!mealPlan[dst][slot]) mealPlan[dst][slot] = [];
+        if (!mealPlan[dst][slot].includes(id)) { mealPlan[dst][slot].push(id); copied++; }
+      });
+    });
+  }
+  savePlan();
+  renderPlan();
+  if (copied === 0) alert('先週の献立が見つかりませんでした');
+}
+
+function removeFromPlan(ds, slot, idx) {
+  if (!mealPlan[ds] || !mealPlan[ds][slot]) return;
+  mealPlan[ds][slot].splice(idx, 1);
+  if (mealPlan[ds][slot].length === 0) delete mealPlan[ds][slot];
+  if (Object.keys(mealPlan[ds]).length === 0) delete mealPlan[ds];
+  savePlan();
+  render();
+}
+
+function chipMenu(ds, slot, idx) {
+  const id = planOf(ds, slot)[idx];
+  const r = recipeById(id);
+  let h = '<div class="grabber"></div><h3>' + esc(recipeName(id)) + '</h3>';
+  h += '<div class="muted" style="margin:-6px 0 12px;">' + fullLabel(ds) + ' ' + SLOTNAME[slot] + '</div>';
+  if (r) {
+    const ings = (r.ingredients || []).map(l => esc(lineName(l))).join('・');
+    if (ings) h += '<div class="muted" style="margin-bottom:12px;">材料: ' + ings + '</div>';
+  }
+  h += '<button class="btn wide ghost" style="margin-bottom:8px;" onclick="openMoveSheet(\'' + ds + '\',\'' + slot + '\',' + idx + ', false)">📆 別の日へ移動</button>';
+  h += '<button class="btn wide ghost" style="margin-bottom:8px;" onclick="openMoveSheet(\'' + ds + '\',\'' + slot + '\',' + idx + ', true)">📄 別の日へコピー</button>';
+  if (r && !r.archived) h += '<button class="btn wide ghost" style="margin-bottom:8px;" onclick="closeSheet(); openRecipeModal(\'' + id + '\')">✏️ レシピを見る・編集</button>';
+  h += '<button class="btn wide danger" onclick="removeFromPlan(\'' + ds + '\',\'' + slot + '\',' + idx + ')">この日から外す</button>';
+  openSheet(h);
+}
+function openMoveSheet(ds, slot, idx, isCopy) {
+  const ws = weekStartOf(ds);
+  let h = '<div class="grabber"></div><h3>' + (isCopy ? 'コピー先' : '移動先') + 'の日を選択</h3>';
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(ws, i);
+    if (d === ds && !isCopy) continue;
+    h += '<button class="btn wide ghost" style="margin-bottom:8px;" onclick="doMove(\'' + ds + '\',\'' + slot + '\',' + idx + ',\'' + d + '\',' + isCopy + ')">' + fullLabel(d) + '</button>';
+  }
+  openSheet(h);
+}
+function doMove(ds, slot, idx, dst, isCopy) {
+  const id = planOf(ds, slot)[idx];
+  if (!id) return;
+  if (!mealPlan[dst]) mealPlan[dst] = {};
+  if (!mealPlan[dst][slot]) mealPlan[dst][slot] = [];
+  if (!mealPlan[dst][slot].includes(id)) mealPlan[dst][slot].push(id);
+  if (!isCopy) {
+    mealPlan[ds][slot].splice(idx, 1);
+    if (mealPlan[ds][slot].length === 0) delete mealPlan[ds][slot];
+    if (Object.keys(mealPlan[ds]).length === 0) delete mealPlan[ds];
+  }
+  savePlan();
+  render();
+}
+
+/* ---------- レシピ選択シート ---------- */
+let pickTarget = null;
+function openPicker(ds, slot) {
+  pickTarget = { ds, slot };
+  let h = '<div class="grabber"></div><h3>' + fullLabel(ds) + ' ' + SLOTNAME[slot] + ' に追加</h3>';
+  h += '<input type="search" placeholder="レシピを検索" oninput="renderPickerList(this.value)" style="margin-bottom:10px;">';
+  h += '<div id="picker-list"></div>';
+  h += '<div style="margin-top:12px;"><button class="btn wide" onclick="closeSheet(); openRecipeModal(null, true)">＋ 新しいレシピを登録して追加</button></div>';
+  openSheet(h);
+  renderPickerList('');
+}
+function renderPickerList(q) {
+  q = (q || '').trim();
+  let list = recipes.filter(r => !r.archived && (!q || r.name.includes(q) || (r.tags || []).some(t => t.includes(q))));
+  list = list.map(r => ({ r, last: lastCooked(r.id) }));
+  list.sort((a, b) => (a.last || '0') < (b.last || '0') ? -1 : 1);
+  let h = '';
+  if (list.length === 0) h = '<div class="empty">レシピがありません</div>';
+  else {
+    if (!q) h += '<div class="muted" style="margin-bottom:4px;">最近作っていない順</div>';
+    list.slice(0, 30).forEach(x => {
+      h += '<div class="listrow row" onclick="pickRecipe(\'' + x.r.id + '\')"><span class="grow"><b>' + esc(x.r.name) + '</b> <span class="badge ' + CATBADGE[x.r.category] + '">' + esc(x.r.category) + '</span></span><span class="muted">' + lastCookedLabel(x.r.id) + '</span></div>';
+    });
+  }
+  document.getElementById('picker-list').innerHTML = h;
+}
+function pickRecipe(id) {
+  if (!pickTarget) return;
+  const { ds, slot } = pickTarget;
+  if (!mealPlan[ds]) mealPlan[ds] = {};
+  if (!mealPlan[ds][slot]) mealPlan[ds][slot] = [];
+  if (!mealPlan[ds][slot].includes(id)) mealPlan[ds][slot].push(id);
+  savePlan();
+  pickTarget = null;
+  render();
+}
+
+/* ---------- 献立（レシピ・材料）---------- */
+let rcpQ = '', rcpCat = '';
+function renderRecipes() {
+  let h = '<h2 class="pagetitle">🍳 レシピ帳（' + recipes.filter(r => !r.archived).length + '件）</h2>';
+  h += '<input type="search" placeholder="レシピ名・タグで検索" value="' + esc(rcpQ) + '" oninput="rcpQ=this.value; renderRcpList()" style="margin-bottom:10px;">';
+  h += '<div style="margin-bottom:10px;">';
+  RCPCATS.forEach(c => {
+    h += '<span class="chip" style="' + (rcpCat === c ? '' : 'background:#F4EBDE; color:var(--sub); font-weight:400;') + '" onclick="rcpCat = rcpCat===\'' + c + '\' ? \'\' : \'' + c + '\'; renderRecipes()">' + c + '</span>';
+  });
+  h += '</div><div class="card" id="rcp-list"></div>';
+  h += '<button class="fab" onclick="openRecipeModal(null)">＋</button>';
+  document.getElementById('view').innerHTML = h;
+  renderRcpList();
+}
+function renderRcpList() {
+  const q = rcpQ.trim();
+  let list = recipes.filter(r => !r.archived);
+  if (rcpCat) list = list.filter(r => r.category === rcpCat);
+  if (q) list = list.filter(r => r.name.includes(q) || (r.tags || []).some(t => t.includes(q)));
+  list.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  let h = '';
+  if (list.length === 0) h = '<div class="empty"><span class="big">🍳</span>' + (recipes.length === 0 ? 'まずはよく作る献立を登録しましょう<br>右下の「＋」から' : '該当するレシピがありません') + '</div>';
+  list.forEach(r => {
+    const names = (r.ingredients || []).map(lineName).filter(Boolean);
+    const summary = names.slice(0, 3).join('・') + (names.length > 3 ? ' ほか' + (names.length - 3) + '品' : '');
+    h += '<div class="listrow" onclick="openRecipeModal(\'' + r.id + '\')"><div class="row"><b class="grow">' + esc(r.name) + '</b><span class="badge ' + CATBADGE[r.category] + '">' + esc(r.category) + '</span></div>';
+    h += '<div class="row"><span class="muted grow" style="overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">' + esc(summary || '材料未登録') + '</span><span class="muted" style="flex-shrink:0;">' + lastCookedLabel(r.id) + '</span></div></div>';
+  });
+  document.getElementById('rcp-list').innerHTML = h;
+}
+function lineName(l) { return l.name || ''; }
+
+/* ---------- レシピ編集モーダル ---------- */
+let editRcpId = null, rcpFromPicker = false, savedPickTarget = null;
+function openRecipeModal(id, fromPicker) {
+  editRcpId = id;
+  rcpFromPicker = !!fromPicker;
+  savedPickTarget = fromPicker ? pickTarget : null;
+  const r = id ? recipeById(id) : null;
+  let h = '<div class="inner"><div class="mhead"><h2>' + (r ? 'レシピを編集' : '新しいレシピ') + '</h2><button class="xbtn" onclick="closeModal()">✕</button></div>';
+  h += '<label class="f">料理名</label><input type="text" id="rf-name" value="' + esc(r ? r.name : '') + '" placeholder="肉じゃが">';
+  h += '<label class="f">カテゴリ</label><select id="rf-cat">' + RCPCATS.map(c => '<option' + (r && r.category === c ? ' selected' : '') + '>' + c + '</option>').join('') + '</select>';
+  h += '<label class="f">タグ（スペース区切り・任意）</label><input type="text" id="rf-tags" value="' + esc(r && r.tags ? r.tags.join(' ') : '') + '" placeholder="和食 煮物">';
+  h += '<label class="f">材料</label><div id="rf-ings"></div>';
+  h += '<button class="btn sm ghost" onclick="addIngRow()">＋ 材料を追加</button>';
+  h += '<label class="f">メモ（任意）</label><textarea id="rf-memo" rows="3" placeholder="圧力鍋で10分など">' + esc(r ? r.memo || '' : '') + '</textarea>';
+  h += '<div style="margin-top:20px;"><button class="btn wide" onclick="saveRecipe()">保存する</button></div>';
+  if (r) h += '<div style="margin-top:10px;"><button class="btn wide danger" onclick="deleteRecipe()">このレシピを削除</button></div>';
+  h += '</div>';
+  const modal = document.getElementById('modal');
+  modal.innerHTML = h;
+  modal.classList.add('show');
+  refreshDatalist();
+  const lines = r && r.ingredients && r.ingredients.length ? r.ingredients : [null, null];
+  lines.forEach(l => addIngRow(l));
+}
+function refreshDatalist() {
+  document.getElementById('ing-list').innerHTML = ingredientNames().map(n => '<option value="' + esc(n) + '">').join('');
+}
+function addIngRow(line) {
+  const wrap = document.getElementById('rf-ings');
+  const div = document.createElement('div');
+  div.className = 'ingrow';
+  div.innerHTML = '<input type="text" class="nm" list="ing-list" placeholder="材料名" value="' + esc(line ? lineName(line) : '') + '">'
+    + '<input type="text" class="qt" placeholder="量" value="' + esc(line ? line.qty || '' : '') + '">'
+    + '<input type="text" class="un" placeholder="単位" value="' + esc(line ? line.unit || '' : '') + '">'
+    + '<button class="delrow" onclick="this.parentNode.remove()">✕</button>';
+  wrap.appendChild(div);
+}
+function saveRecipe() {
+  const name = document.getElementById('rf-name').value.trim();
+  if (!name) { alert('料理名を入力してください'); return; }
+  const lines = [];
+  document.querySelectorAll('#rf-ings .ingrow').forEach(row => {
+    const nm = row.querySelector('.nm').value.trim();
+    if (!nm) return;
+    const qty = row.querySelector('.qt').value.trim();
+    const unit = row.querySelector('.un').value.trim();
+    lines.push({ name: nm, qty, unit });
+  });
+  const tags = document.getElementById('rf-tags').value.trim().split(/\s+/).filter(Boolean);
+  const data = {
+    name, category: document.getElementById('rf-cat').value, tags,
+    ingredients: lines, memo: document.getElementById('rf-memo').value.trim(),
+    updatedAt: todayStr()
+  };
+  let newId = editRcpId;
+  if (editRcpId) {
+    Object.assign(recipeById(editRcpId), data);
+  } else {
+    newId = uid();
+    recipes.push(Object.assign({ id: newId, archived: false }, data));
+  }
+  saveRcp();
+  closeModal();
+  if (rcpFromPicker && savedPickTarget) {
+    pickTarget = savedPickTarget;
+    pickRecipe(newId);
+  } else render();
+}
+function deleteRecipe() {
+  const r = recipeById(editRcpId);
+  if (!r) return;
+  const used = Object.keys(mealPlan).some(ds => Object.keys(mealPlan[ds]).some(slot => mealPlan[ds][slot].includes(r.id)));
+  if (!confirm('「' + r.name + '」を削除しますか？' + (used ? '\n（過去の予定には名前が残ります）' : ''))) return;
+  if (used) { r.archived = true; r.updatedAt = todayStr(); }
+  else recipes = recipes.filter(x => x.id !== r.id);
+  saveRcp();
+  closeModal();
+  render();
+}
+
+/* ---------- 買い物リスト ---------- */
+let shopWS = null, shopItems = [];
+function parseQty(q) {
+  if (!q) return null;
+  const frac = q.match(/^(\d+)\/(\d+)$/);
+  if (frac) return Number(frac[1]) / Number(frac[2]);
+  const n = parseFloat(q);
+  return isNaN(n) ? null : n;
+}
+function fmtQty(n) {
+  const r = Math.round(n * 100) / 100;
+  if (Math.abs(r - 0.5) < 0.001) return '1/2';
+  if (Math.abs(r - 0.25) < 0.001) return '1/4';
+  if (Math.abs(r - 0.75) < 0.001) return '3/4';
+  return String(r);
+}
+function buildShopping(ws) {
+  const map = new Map();
+  const weekRecipes = [];
+  for (let i = 0; i < 7; i++) {
+    const ds = addDays(ws, i);
+    activeSlots().forEach(slot => planOf(ds, slot).forEach(id => {
+      const r = recipeById(id);
+      if (!r) return;
+      if (!weekRecipes.includes(r.name)) weekRecipes.push(r.name);
+      (r.ingredients || []).forEach(l => {
+        const nm = lineName(l);
+        if (!nm) return;
+        const unit = l.unit || '';
+        const key = nm + '|' + unit;
+        if (!map.has(key)) map.set(key, { key, name: nm, unit, sum: 0, vague: 0 });
+        const e = map.get(key);
+        const n = parseQty(l.qty);
+        if (n === null) e.vague++; else e.sum += n;
+      });
+    }));
+  }
+  const items = [...map.values()];
+  items.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  return { items, weekRecipes };
+}
+function qtyLabel(e) {
+  const parts = [];
+  if (e.sum > 0) parts.push(fmtQty(e.sum) + e.unit);
+  if (e.vague > 0) parts.push(e.sum > 0 ? '＋適量' : '適量');
+  return parts.join(' ');
+}
+function renderShopping() {
+  if (!shopWS) shopWS = weekStartOf(todayStr());
+  const end = addDays(shopWS, 6);
+  const { items, weekRecipes } = buildShopping(shopWS);
+  shopItems = items;
+  const ck = checks[shopWS] || {};
+  let h = '<div class="weeknav"><button class="navbtn" onclick="moveShopWeek(-1)">◀</button><b>' + mdLabel(shopWS) + ' 〜 ' + mdLabel(end) + ' の買い物</b><button class="navbtn" onclick="moveShopWeek(1)">▶</button></div>';
+  if (items.length === 0) {
+    h += '<div class="empty"><span class="big">🛒</span>この週の献立がまだありません<br>プランで献立を決めると自動で材料が集まります</div>';
+    h += '<button class="btn wide" onclick="planWS=shopWS; switchTab(\'plan\')">🗓 この週のプランを立てる</button>';
+    document.getElementById('view').innerHTML = h;
+    return;
+  }
+  const doneCount = items.filter(e => ck[e.key]).length;
+  h += '<div class="card"><div class="row" style="margin-bottom:4px;"><span class="muted grow">📖 ' + weekRecipes.slice(0, 6).map(esc).join('・') + (weekRecipes.length > 6 ? ' ほか' : '') + '</span></div>';
+  h += '<div class="muted">' + doneCount + ' / ' + items.length + ' 個 チェック済み</div></div>';
+  h += '<div class="card">';
+  items.forEach((e, i) => {
+    const done = !!ck[e.key];
+    h += '<div class="check' + (done ? ' done' : '') + '" onclick="toggleCheck(' + i + ')"><span class="cbox">' + (done ? '✓' : '') + '</span><span class="nm">' + esc(e.name) + '</span><span class="qty">' + esc(qtyLabel(e)) + '</span></div>';
+  });
+  h += '</div>';
+  h += '<button class="btn ghost wide" onclick="copyShopping()">📋 リストをテキストでコピー</button>';
+  document.getElementById('view').innerHTML = h;
+}
+function moveShopWeek(n) { shopWS = addDays(shopWS, n * 7); renderShopping(); }
+function toggleCheck(i) {
+  const e = shopItems[i];
+  if (!checks[shopWS]) checks[shopWS] = {};
+  if (checks[shopWS][e.key]) delete checks[shopWS][e.key];
+  else checks[shopWS][e.key] = true;
+  saveChecks();
+  renderShopping();
+}
+function copyShopping() {
+  const end = addDays(shopWS, 6);
+  let text = '【買い物リスト ' + mdLabel(shopWS) + '〜' + mdLabel(end) + '】\n';
+  shopItems.forEach(e => {
+    text += '・' + e.name + (qtyLabel(e) ? ' ' + qtyLabel(e) : '') + '\n';
+  });
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => alert('コピーしました')).catch(() => prompt('コピーしてください', text));
+  } else prompt('コピーしてください', text);
+}
+
+/* ---------- 設定 ---------- */
+function openSettings() {
+  let h = '<div class="inner"><div class="mhead"><h2>設定</h2><button class="xbtn" onclick="closeModal()">✕</button></div>';
+  h += '<div class="sec-title">管理する食事</div><div class="card">';
+  SLOTDEFS.forEach(([k, label]) => {
+    h += '<label class="row" style="padding:8px 0; cursor:pointer;"><input type="checkbox" style="width:22px; height:22px; accent-color:var(--coral);" ' + (settings.slots.includes(k) ? 'checked' : '') + ' onchange="toggleSlot(\'' + k + '\', this)"><span>' + label + '</span></label>';
+  });
+  h += '</div>';
+  h += '<div class="sec-title">週の開始曜日</div><div class="card"><select onchange="settings.weekStart=this.value; saveSettings(); planWS=null; shopWS=null;"><option value="monday"' + (settings.weekStart === 'monday' ? ' selected' : '') + '>月曜日</option><option value="sunday"' + (settings.weekStart === 'sunday' ? ' selected' : '') + '>日曜日</option></select></div>';
+  h += '<div class="sec-title">バックアップ</div><div class="card">';
+  h += '<div class="muted" style="margin-bottom:10px;">データはこの端末のブラウザ内のみに保存されます。定期的なエクスポートと、別端末への引き継ぎ（AirDrop等）にお使いください。' + (settings.lastExport ? '<br>最終エクスポート: ' + settings.lastExport : '') + '</div>';
+  h += '<button class="btn wide" style="margin-bottom:8px;" onclick="exportData()">📤 エクスポート（JSON保存）</button>';
+  h += '<button class="btn wide ghost" onclick="document.getElementById(\'import-file\').click()">📥 インポート（JSON読込）</button></div>';
+  h += '<div class="sec-title">データ</div><div class="card"><button class="btn wide danger" onclick="wipeAll()">全データを削除</button></div>';
+  h += '<div class="muted" style="text-align:center; margin-top:14px;">献立プランナー v1.0</div></div>';
+  const modal = document.getElementById('modal');
+  modal.innerHTML = h;
+  modal.classList.add('show');
+}
+function toggleSlot(k, cb) {
+  let s = settings.slots.filter(x => x !== k);
+  if (cb.checked) s.push(k);
+  if (s.length === 0) { cb.checked = true; alert('最低1つは選択してください'); return; }
+  settings.slots = SLOTDEFS.map(d => d[0]).filter(x => s.includes(x));
+  saveSettings();
+}
+function exportData() {
+  const data = {
+    app: 'kondate-planner', schemaVersion: 2, exportedAt: new Date().toISOString(),
+    recipes, mealPlan, shoppingChecks: checks, settings
+  };
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kondate-backup-' + todayStr() + '.json';
+  a.click();
+  settings.lastExport = todayStr();
+  saveSettings();
+  openSettings();
+}
+function importData(ev) {
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const d = JSON.parse(reader.result);
+      if (d.app !== 'kondate-planner') { alert('このアプリのバックアップファイルではありません'); return; }
+      if (!confirm('現在のデータをインポート内容で上書きします。よろしいですか？')) return;
+      recipes = d.recipes || [];
+      inlineIngredientRefs(recipes, d.ingredients);
+      mealPlan = d.mealPlan || {};
+      checks = d.shoppingChecks || {};
+      settings = Object.assign({ slots: ['dinner'], weekStart: 'monday', lastExport: null }, d.settings || {});
+      saveRcp(); savePlan(); saveChecks(); saveSettings();
+      planWS = null; shopWS = null;
+      closeModal();
+      render();
+      alert('インポートしました');
+    } catch (e) { alert('読み込みに失敗しました: ' + e.message); }
+  };
+  reader.readAsText(file);
+}
+function wipeAll() {
+  if (!confirm('レシピ・材料・予定をすべて削除します。よろしいですか？')) return;
+  if (!confirm('本当に削除しますか？（元に戻せません）')) return;
+  ['kondate_ingredients','kondate_recipes','kondate_mealPlan','kondate_shoppingChecks','kondate_settings'].forEach(k => localStorage.removeItem(k));
+  location.reload();
+}
+
+/* ---------- 共通 ---------- */
+function openSheet(html) {
+  document.getElementById('sheet').innerHTML = html;
+  document.getElementById('sheet').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+}
+function closeSheet() {
+  document.getElementById('sheet').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+  document.getElementById('modal').innerHTML = '';
+}
+
+switchTab('today');
+</script>
+</body>
+</html>
