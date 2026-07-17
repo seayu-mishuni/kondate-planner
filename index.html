@@ -14,15 +14,15 @@
   :root {
     --bg: #FFF6E9;
     --card: #FFFFFF;
-    --ink: #2A1D1B;
-    --sub: #6E5F57;
+    --ink: #241815;
+    --sub: #5B4C45;
     --line: #F2E6D8;
     --coral: #FF6B4A;
     --coral-soft: #FFE4DB;
     --coral-deep: #C23E22;
-    --teal: #00A896;
-    --teal-soft: #D6F2EC;
-    --teal-deep: #056459;
+    --teal: #2F8FE0;
+    --teal-soft: #DCEBFA;
+    --teal-deep: #1D5C99;
     --yellow: #FFC53D;
     --yellow-soft: #FFF0CC;
     --yellow-deep: #8A5F00;
@@ -34,10 +34,11 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0; background: var(--bg); color: var(--ink);
-    font-family: "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN", -apple-system, sans-serif;
+    font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif;
     font-size: 16px; line-height: 1.5;
     -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
   }
+  .pop-font { font-family: "Hiragino Maru Gothic ProN", -apple-system, sans-serif; }
   .app { max-width: 640px; margin: 0 auto; padding: 0 14px calc(96px + env(safe-area-inset-bottom)); }
   header {
     position: sticky; top: 0; z-index: 5; background: var(--bg);
@@ -55,13 +56,13 @@
   }
   nav button {
     flex: 1; border: none; background: none; font-family: inherit; cursor: pointer;
-    font-size: 11px; color: var(--sub); padding: 6px 0 5px; border-radius: 20px; line-height: 1.2;
+    font-size: 12px; font-weight: 600; color: var(--sub); padding: 6px 0 5px; border-radius: 20px; line-height: 1.2;
   }
   nav button .ico { display: block; font-size: 20px; margin-bottom: 1px; }
   nav button.on { background: var(--coral-soft); color: var(--coral-deep); font-weight: 600; }
 
   .card { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); padding: 14px 16px; margin-bottom: 14px; }
-  .muted { color: var(--sub); font-size: 13px; }
+  .muted { color: var(--sub); font-size: 13px; font-weight: 500; }
   .sec-title { font-size: 14px; color: var(--sub); margin: 18px 4px 8px; font-weight: 600; }
 
   .btn {
@@ -80,7 +81,7 @@
     background: var(--teal-soft); color: var(--teal-deep); margin: 2px 4px 2px 0; cursor: pointer; font-weight: 600;
   }
   .chip.ghost { background: none; border: 1.5px dashed var(--sub); color: var(--sub); font-weight: 400; }
-  .badge { display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 999px; font-weight: 600; vertical-align: 1px; }
+  .badge { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; font-weight: 600; vertical-align: 1px; }
   .b-main { background: var(--coral-soft); color: var(--coral-deep); }
   .b-side { background: var(--teal-soft); color: var(--teal-deep); }
   .b-soup { background: var(--purple-soft); color: var(--purple-deep); }
@@ -109,18 +110,18 @@
   .daylabel b { display: block; font-size: 16px; color: var(--ink); }
   .daylabel .sat { color: #2980D9; } .daylabel .sun { color: #E05B4B; }
   .slotline { margin: 1px 0; }
-  .slotname { font-size: 11px; color: var(--sub); margin-right: 4px; }
+  .slotname { font-size: 12px; font-weight: 600; color: var(--sub); margin-right: 4px; }
 
   .cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .cal th { font-size: 11px; color: var(--sub); font-weight: 600; padding: 4px 0; }
+  .cal th { font-size: 12px; color: var(--sub); font-weight: 600; padding: 4px 0; }
   .cal td { vertical-align: top; height: 58px; padding: 2px 1px; cursor: pointer; border-radius: 10px; }
   .cal td:active { background: var(--coral-soft); }
   .cal .dnum { font-size: 12px; text-align: center; width: 22px; height: 22px; line-height: 22px; border-radius: 50%; margin: 0 auto 1px; font-weight: 600; }
   .cal th.sun, .cal td.sun .dnum { color: #E05B4B; }
   .cal th.sat, .cal td.sat .dnum { color: #2980D9; }
   .cal td.today .dnum { background: var(--coral); color: #fff; }
-  .cal .m { font-size: 10px; line-height: 1.25; color: var(--teal-deep); text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .cal .more { font-size: 9px; color: var(--sub); text-align: center; }
+  .cal .m { font-size: 11px; font-weight: 600; line-height: 1.25; color: var(--teal-deep); text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .cal .more { font-size: 10px; font-weight: 600; color: var(--sub); text-align: center; }
 
   .listrow { padding: 11px 2px; border-bottom: 1.5px solid var(--line); cursor: pointer; }
   .listrow:last-child { border-bottom: none; }
@@ -175,7 +176,7 @@
 </head>
 <body>
 <header>
-  <h1>献立プランナー<span class="dot">●</span></h1>
+  <h1 class="pop-font">献立プランナー<span class="dot">●</span></h1>
   <button class="gear" onclick="openSettings()" aria-label="設定">⚙️</button>
 </header>
 <div class="app" id="view"></div>
