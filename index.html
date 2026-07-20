@@ -377,6 +377,11 @@ function lastCookedLabel(recipeId) {
 
 let activeTab = 'today';
 function switchTab(t) {
+  if (activeTab === t) {
+    if (t === 'today') { calWS = weekStartOf(todayStr()); calCur = todayStr().slice(0, 7); }
+    else if (t === 'plan') planWS = weekStartOf(todayStr());
+    else if (t === 'shopping') shopWS = weekStartOf(todayStr());
+  }
   activeTab = t;
   ['today','plan','recipes','shopping'].forEach(k => {
     document.getElementById('nav-' + k).classList.toggle('on', k === t);
