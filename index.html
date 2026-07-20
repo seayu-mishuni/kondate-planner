@@ -617,7 +617,7 @@ let pickTarget = null;
 function openPicker(ds, slot) {
   pickTarget = { ds, slot };
   let h = '<div class="grabber"></div><h3>' + fullLabel(ds) + ' ' + SLOTNAME[slot] + ' に追加</h3>';
-  h += '<input type="search" placeholder="レシピを検索" oninput="renderPickerList(this.value)" style="margin-bottom:10px;">';
+  h += '<input type="search" placeholder="レシピを検索" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" oninput="renderPickerList(this.value)" style="margin-bottom:10px;">';
   h += '<div id="picker-list"></div>';
   h += '<div style="margin-top:12px;"><button class="btn wide" onclick="closeSheet(); openRecipeModal(null, true)">＋ 新しいレシピを登録して追加</button></div>';
   openSheet(h);
@@ -653,7 +653,7 @@ function pickRecipe(id) {
 let rcpQ = '', rcpCat = '';
 function renderRecipes() {
   let h = '<h2 class="pagetitle">🍳 レシピ帳（' + recipes.filter(r => !r.archived).length + '件）</h2>';
-  h += '<input type="search" placeholder="レシピ名・タグで検索" value="' + esc(rcpQ) + '" oninput="rcpQ=this.value; renderRcpList()" style="margin-bottom:10px;">';
+  h += '<input type="search" placeholder="レシピ名・タグで検索" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(rcpQ) + '" oninput="rcpQ=this.value; renderRcpList()" style="margin-bottom:10px;">';
   h += '<div style="margin-bottom:10px;">';
   RCPCATS.forEach(c => {
     h += '<span class="chip" style="' + (rcpCat === c ? '' : 'background:var(--chip-off); color:var(--sub); font-weight:400;') + '" onclick="rcpCat = rcpCat===\'' + c + '\' ? \'\' : \'' + c + '\'; renderRecipes()">' + c + '</span>';
@@ -689,9 +689,9 @@ function openRecipeModal(id, fromPicker) {
   savedPickTarget = fromPicker ? pickTarget : null;
   const r = id ? recipeById(id) : null;
   let h = '<div class="inner"><div class="mhead"><h2>' + (r ? 'レシピを編集' : '新しいレシピ') + '</h2><button class="xbtn" onclick="closeModal()">✕</button></div>';
-  h += '<label class="f">料理名</label><input type="text" id="rf-name" value="' + esc(r ? r.name : '') + '" placeholder="肉じゃが">';
+  h += '<label class="f">料理名</label><input type="text" id="rf-name" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(r ? r.name : '') + '" placeholder="肉じゃが">';
   h += '<label class="f">カテゴリ</label><select id="rf-cat">' + RCPCATS.map(c => '<option' + (r && r.category === c ? ' selected' : '') + '>' + c + '</option>').join('') + '</select>';
-  h += '<label class="f">タグ（スペース区切り・任意）</label><input type="text" id="rf-tags" value="' + esc(r && r.tags ? r.tags.join(' ') : '') + '" placeholder="和食 煮物">';
+  h += '<label class="f">タグ（スペース区切り・任意）</label><input type="text" id="rf-tags" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(r && r.tags ? r.tags.join(' ') : '') + '" placeholder="和食 煮物">';
   h += '<label class="f">材料</label><div id="rf-ings"></div>';
   h += '<button class="btn sm ghost" onclick="addIngRow()">＋ 材料を追加</button>';
   h += '<label class="f">メモ（任意）</label><textarea id="rf-memo" rows="3" placeholder="圧力鍋で10分など">' + esc(r ? r.memo || '' : '') + '</textarea>';
@@ -712,9 +712,9 @@ function addIngRow(line) {
   const wrap = document.getElementById('rf-ings');
   const div = document.createElement('div');
   div.className = 'ingrow';
-  div.innerHTML = '<input type="text" class="nm" list="ing-list" placeholder="材料名" value="' + esc(line ? lineName(line) : '') + '">'
-    + '<input type="text" class="qt" placeholder="量" value="' + esc(line ? line.qty || '' : '') + '">'
-    + '<input type="text" class="un" placeholder="単位" value="' + esc(line ? line.unit || '' : '') + '">'
+  div.innerHTML = '<input type="text" class="nm" list="ing-list" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="材料名" value="' + esc(line ? lineName(line) : '') + '">'
+    + '<input type="text" class="qt" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="量" value="' + esc(line ? line.qty || '' : '') + '">'
+    + '<input type="text" class="un" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="単位" value="' + esc(line ? line.unit || '' : '') + '">'
     + '<button class="delrow" onclick="this.parentNode.remove()">✕</button>';
   wrap.appendChild(div);
 }
@@ -838,7 +838,7 @@ function renderShopping() {
     const done = !!ck['extra:' + e.id];
     h += '<div class="check' + (done ? ' done' : '') + '"><span class="cbox" onclick="toggleExtraCheck(\'' + e.id + '\')">' + (done ? '✓' : '') + '</span><span class="nm" onclick="toggleExtraCheck(\'' + e.id + '\')">' + esc(e.name) + '</span><span class="qty">' + esc(e.qty || '') + '</span><button class="delrow" onclick="deleteExtraItem(\'' + e.id + '\')">✕</button></div>';
   });
-  h += '<div class="row" style="margin-top:' + (extraList.length ? '10px' : '0') + ';"><input id="extra-name" type="text" placeholder="品名（例：ラップ）" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" name="kondate-extra-name" style="flex:2;" onkeydown="if(event.key===\'Enter\')addExtraItem()"><input id="extra-qty" type="text" placeholder="数量" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" name="kondate-extra-qty" style="flex:1;" onkeydown="if(event.key===\'Enter\')addExtraItem()"></div>';
+  h += '<div class="row" style="margin-top:' + (extraList.length ? '10px' : '0') + ';"><input id="extra-name" type="text" placeholder="品名（例：ラップ）" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:2;" onkeydown="if(event.key===\'Enter\')addExtraItem()"><input id="extra-qty" type="text" placeholder="数量" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1;" onkeydown="if(event.key===\'Enter\')addExtraItem()"></div>';
   h += '<button class="btn ghost wide" style="margin-top:8px;" onclick="addExtraItem()">＋ 追加</button>';
   h += '</div>';
   if (items.length > 0 || extraList.length > 0) h += '<button class="btn ghost wide" onclick="copyShopping()">📋 リストをテキストでコピー</button>';
