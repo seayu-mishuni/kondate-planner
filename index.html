@@ -689,7 +689,7 @@ function openRecipeModal(id, fromPicker) {
   savedPickTarget = fromPicker ? pickTarget : null;
   const r = id ? recipeById(id) : null;
   let h = '<div class="inner"><div class="mhead"><h2>' + (r ? 'レシピを編集' : '新しいレシピ') + '</h2><button class="xbtn" onclick="closeModal()">✕</button></div>';
-  h += '<label class="f">料理名</label><input type="text" id="rf-name" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(r ? r.name : '') + '" placeholder="肉じゃが">';
+  h += '<label class="f">料理名</label><input type="text" id="rf-title" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(r ? r.name : '') + '" placeholder="肉じゃが">';
   h += '<label class="f">カテゴリ</label><select id="rf-cat">' + RCPCATS.map(c => '<option' + (r && r.category === c ? ' selected' : '') + '>' + c + '</option>').join('') + '</select>';
   h += '<label class="f">タグ（スペース区切り・任意）</label><input type="text" id="rf-tags" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(r && r.tags ? r.tags.join(' ') : '') + '" placeholder="和食 煮物">';
   h += '<label class="f">材料</label><div id="rf-ings"></div>';
@@ -719,7 +719,7 @@ function addIngRow(line) {
   wrap.appendChild(div);
 }
 function saveRecipe() {
-  const name = document.getElementById('rf-name').value.trim();
+  const name = document.getElementById('rf-title').value.trim();
   if (!name) { alert('料理名を入力してください'); return; }
   const lines = [];
   document.querySelectorAll('#rf-ings .ingrow').forEach(row => {
@@ -838,7 +838,7 @@ function renderShopping() {
     const done = !!ck['extra:' + e.id];
     h += '<div class="check' + (done ? ' done' : '') + '"><span class="cbox" onclick="toggleExtraCheck(\'' + e.id + '\')">' + (done ? '✓' : '') + '</span><span class="nm" onclick="toggleExtraCheck(\'' + e.id + '\')">' + esc(e.name) + '</span><span class="qty">' + esc(e.qty || '') + '</span><button class="delrow" onclick="deleteExtraItem(\'' + e.id + '\')">✕</button></div>';
   });
-  h += '<div class="row" style="margin-top:' + (extraList.length ? '10px' : '0') + ';"><input id="extra-name" type="text" placeholder="品名（例：ラップ）" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:2;" onkeydown="if(event.key===\'Enter\')addExtraItem()"><input id="extra-qty" type="text" placeholder="数量" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1;" onkeydown="if(event.key===\'Enter\')addExtraItem()"></div>';
+  h += '<div class="row" style="margin-top:' + (extraList.length ? '10px' : '0') + ';"><input id="extra-item" type="text" placeholder="品名（例：ラップ）" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:2;" onkeydown="if(event.key===\'Enter\')addExtraItem()"><input id="extra-qty" type="text" placeholder="数量" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1;" onkeydown="if(event.key===\'Enter\')addExtraItem()"></div>';
   h += '<button class="btn ghost wide" style="margin-top:8px;" onclick="addExtraItem()">＋ 追加</button>';
   h += '</div>';
   if (items.length > 0 || extraList.length > 0) h += '<button class="btn ghost wide" onclick="copyShopping()">📋 リストをテキストでコピー</button>';
@@ -862,7 +862,7 @@ function toggleExtraCheck(id) {
   renderShopping();
 }
 function addExtraItem() {
-  const nameEl = document.getElementById('extra-name');
+  const nameEl = document.getElementById('extra-item');
   const qtyEl = document.getElementById('extra-qty');
   const name = nameEl.value.trim();
   if (!name) { nameEl.focus(); return; }
@@ -994,6 +994,26 @@ function closeModal() {
   document.getElementById('modal').classList.remove('show');
   document.getElementById('modal').innerHTML = '';
 }
+
+(function() {
+  let sx = 0, sy = 0, tracking = false;
+  const view = document.getElementById('view');
+  view.addEventListener('touchstart', function(e) {
+    if (e.touches.length !== 1 || e.target.closest('input,textarea,select,button')) { tracking = false; return; }
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true;
+  }, { passive: true });
+  view.addEventListener('touchend', function(e) {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const dir = dx < 0 ? 1 : -1;
+    if (activeTab === 'today') { if (calMode === 'week') moveCalWeek(dir); else moveCal(dir); }
+    else if (activeTab === 'plan') movePlanWeek(dir);
+    else if (activeTab === 'shopping') moveShopWeek(dir);
+  }, { passive: true });
+})();
 
 switchTab('today');
 </script>
