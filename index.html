@@ -29,7 +29,37 @@
     --purple: #8B7BF4;
     --purple-soft: #E9E5FD;
     --purple-deep: #4A3DA8;
+    --chip-off: #F4EBDE;
     --shadow: 0 2px 10px rgba(90, 60, 40, .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1B1815;
+      --card: #262220;
+      --ink: #F2E9E2;
+      --sub: #B8A99C;
+      --line: #3A332E;
+      --coral: #FF7A5C;
+      --coral-soft: #4A2C22;
+      --coral-deep: #FFB199;
+      --teal: #5CACF0;
+      --teal-soft: #1F3550;
+      --teal-deep: #A6D3FA;
+      --yellow: #FFD166;
+      --yellow-soft: #45350E;
+      --yellow-deep: #FFE1A0;
+      --purple: #A79BFF;
+      --purple-soft: #332C55;
+      --purple-deep: #CFC7FF;
+      --chip-off: #3A332E;
+      --shadow: 0 2px 10px rgba(0, 0, 0, .4);
+    }
+    .btn.danger { background: var(--card); color: #FF8A75; border-color: #E74C3C; }
+    .b-etc { background: #3A332E; color: #C9BEB5; }
+    .seg { background: #2E2925; }
+    .cbox { border-color: #5A4F45; }
+    .daylabel .sat, .daylabel b.sat, .cal th.sat, .cal td.sat .dnum { color: #6CB4F0; }
+    .daylabel .sun, .daylabel b.sun, .holname, .cal th.sun, .cal td.sun .dnum, .cal .holname { color: #FF8A75; }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
@@ -217,11 +247,13 @@ const DOWJP = ['日','月','火','水','木','金','土'];
 let recipes = store.get('kondate_recipes', []);
 let mealPlan = store.get('kondate_mealPlan', {});
 let checks = store.get('kondate_shoppingChecks', {});
+let extras = store.get('kondate_shoppingExtras', {});
 let settings = Object.assign({ slots: ['dinner'], weekStart: 'monday', lastExport: null }, store.get('kondate_settings', {}));
 
 function saveRcp() { store.set('kondate_recipes', recipes); }
 function savePlan() { store.set('kondate_mealPlan', mealPlan); }
 function saveChecks() { store.set('kondate_shoppingChecks', checks); }
+function saveExtras() { store.set('kondate_shoppingExtras', extras); }
 function saveSettings() { store.set('kondate_settings', settings); }
 
 function inlineIngredientRefs(recipeList, masterList) {
@@ -624,7 +656,7 @@ function renderRecipes() {
   h += '<input type="search" placeholder="レシピ名・タグで検索" value="' + esc(rcpQ) + '" oninput="rcpQ=this.value; renderRcpList()" style="margin-bottom:10px;">';
   h += '<div style="margin-bottom:10px;">';
   RCPCATS.forEach(c => {
-    h += '<span class="chip" style="' + (rcpCat === c ? '' : 'background:#F4EBDE; color:var(--sub); font-weight:400;') + '" onclick="rcpCat = rcpCat===\'' + c + '\' ? \'\' : \'' + c + '\'; renderRecipes()">' + c + '</span>';
+    h += '<span class="chip" style="' + (rcpCat === c ? '' : 'background:var(--chip-off); color:var(--sub); font-weight:400;') + '" onclick="rcpCat = rcpCat===\'' + c + '\' ? \'\' : \'' + c + '\'; renderRecipes()">' + c + '</span>';
   });
   h += '</div><div class="card" id="rcp-list"></div>';
   h += '<button class="fab" onclick="openRecipeModal(null)">＋</button>';
@@ -776,29 +808,40 @@ function qtyLabel(e) {
   if (e.vague > 0) parts.push(e.sum > 0 ? '＋適量' : '適量');
   return parts.join(' ');
 }
+function extrasOf(ws) { return extras[ws] || []; }
 function renderShopping() {
   if (!shopWS) shopWS = weekStartOf(todayStr());
   const end = addDays(shopWS, 6);
   const { items, weekRecipes } = buildShopping(shopWS);
+  const extraList = extrasOf(shopWS);
   shopItems = items;
   const ck = checks[shopWS] || {};
   let h = '<div class="weeknav"><button class="navbtn" onclick="moveShopWeek(-1)">◀</button><b>' + mdLabel(shopWS) + ' 〜 ' + mdLabel(end) + ' の買い物</b><button class="navbtn" onclick="moveShopWeek(1)">▶</button></div>';
-  if (items.length === 0) {
+  if (items.length === 0 && extraList.length === 0) {
     h += '<div class="empty"><span class="big">🛒</span>この週の献立がまだありません<br>プランで献立を決めると自動で材料が集まります</div>';
     h += '<button class="btn wide" onclick="planWS=shopWS; switchTab(\'plan\')">🗓 この週のプランを立てる</button>';
-    document.getElementById('view').innerHTML = h;
-    return;
+  } else {
+    const doneCount = items.filter(e => ck[e.key]).length + extraList.filter(e => ck['extra:' + e.id]).length;
+    h += '<div class="card"><div class="row" style="margin-bottom:4px;"><span class="muted grow">📖 ' + weekRecipes.slice(0, 6).map(esc).join('・') + (weekRecipes.length > 6 ? ' ほか' : '') + '</span></div>';
+    h += '<div class="muted">' + doneCount + ' / ' + (items.length + extraList.length) + ' 個 チェック済み</div></div>';
+    if (items.length > 0) {
+      h += '<div class="card">';
+      items.forEach((e, i) => {
+        const done = !!ck[e.key];
+        h += '<div class="check' + (done ? ' done' : '') + '" onclick="toggleCheck(' + i + ')"><span class="cbox">' + (done ? '✓' : '') + '</span><span class="nm">' + esc(e.name) + '</span><span class="qty">' + esc(qtyLabel(e)) + '</span></div>';
+      });
+      h += '</div>';
+    }
   }
-  const doneCount = items.filter(e => ck[e.key]).length;
-  h += '<div class="card"><div class="row" style="margin-bottom:4px;"><span class="muted grow">📖 ' + weekRecipes.slice(0, 6).map(esc).join('・') + (weekRecipes.length > 6 ? ' ほか' : '') + '</span></div>';
-  h += '<div class="muted">' + doneCount + ' / ' + items.length + ' 個 チェック済み</div></div>';
-  h += '<div class="card">';
-  items.forEach((e, i) => {
-    const done = !!ck[e.key];
-    h += '<div class="check' + (done ? ' done' : '') + '" onclick="toggleCheck(' + i + ')"><span class="cbox">' + (done ? '✓' : '') + '</span><span class="nm">' + esc(e.name) + '</span><span class="qty">' + esc(qtyLabel(e)) + '</span></div>';
+  h += '<div class="sec-title">🧺 手動で追加</div><div class="card">';
+  extraList.forEach(e => {
+    const done = !!ck['extra:' + e.id];
+    h += '<div class="check' + (done ? ' done' : '') + '"><span class="cbox" onclick="toggleExtraCheck(\'' + e.id + '\')">' + (done ? '✓' : '') + '</span><span class="nm" onclick="toggleExtraCheck(\'' + e.id + '\')">' + esc(e.name) + '</span><span class="qty">' + esc(e.qty || '') + '</span><button class="delrow" onclick="deleteExtraItem(\'' + e.id + '\')">✕</button></div>';
   });
+  h += '<div class="row" style="margin-top:' + (extraList.length ? '10px' : '0') + ';"><input id="extra-name" type="text" placeholder="品名（例：ラップ）" style="flex:2;" onkeydown="if(event.key===\'Enter\')addExtraItem()"><input id="extra-qty" type="text" placeholder="数量" style="flex:1;" onkeydown="if(event.key===\'Enter\')addExtraItem()"></div>';
+  h += '<button class="btn ghost wide" style="margin-top:8px;" onclick="addExtraItem()">＋ 追加</button>';
   h += '</div>';
-  h += '<button class="btn ghost wide" onclick="copyShopping()">📋 リストをテキストでコピー</button>';
+  if (items.length > 0 || extraList.length > 0) h += '<button class="btn ghost wide" onclick="copyShopping()">📋 リストをテキストでコピー</button>';
   document.getElementById('view').innerHTML = h;
 }
 function moveShopWeek(n) { shopWS = addDays(shopWS, n * 7); renderShopping(); }
@@ -810,11 +853,40 @@ function toggleCheck(i) {
   saveChecks();
   renderShopping();
 }
+function toggleExtraCheck(id) {
+  const key = 'extra:' + id;
+  if (!checks[shopWS]) checks[shopWS] = {};
+  if (checks[shopWS][key]) delete checks[shopWS][key];
+  else checks[shopWS][key] = true;
+  saveChecks();
+  renderShopping();
+}
+function addExtraItem() {
+  const nameEl = document.getElementById('extra-name');
+  const qtyEl = document.getElementById('extra-qty');
+  const name = nameEl.value.trim();
+  if (!name) { nameEl.focus(); return; }
+  if (!extras[shopWS]) extras[shopWS] = [];
+  extras[shopWS].push({ id: 'ex-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name, qty: qtyEl.value.trim() });
+  saveExtras();
+  renderShopping();
+}
+function deleteExtraItem(id) {
+  if (!extras[shopWS]) return;
+  extras[shopWS] = extras[shopWS].filter(e => e.id !== id);
+  saveExtras();
+  if (checks[shopWS]) delete checks[shopWS]['extra:' + id];
+  saveChecks();
+  renderShopping();
+}
 function copyShopping() {
   const end = addDays(shopWS, 6);
   let text = '【買い物リスト ' + mdLabel(shopWS) + '〜' + mdLabel(end) + '】\n';
   shopItems.forEach(e => {
     text += '・' + e.name + (qtyLabel(e) ? ' ' + qtyLabel(e) : '') + '\n';
+  });
+  extrasOf(shopWS).forEach(e => {
+    text += '・' + e.name + (e.qty ? ' ' + e.qty : '') + '\n';
   });
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => alert('コピーしました')).catch(() => prompt('コピーしてください', text));
@@ -865,7 +937,7 @@ function toggleSlot(k, cb) {
 function exportData() {
   const data = {
     app: 'kondate-planner', schemaVersion: 2, exportedAt: new Date().toISOString(),
-    recipes, mealPlan, shoppingChecks: checks, settings
+    recipes, mealPlan, shoppingChecks: checks, shoppingExtras: extras, settings
   };
   const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -890,8 +962,9 @@ function importData(ev) {
       inlineIngredientRefs(recipes, d.ingredients);
       mealPlan = d.mealPlan || {};
       checks = d.shoppingChecks || {};
+      extras = d.shoppingExtras || {};
       settings = Object.assign({ slots: ['dinner'], weekStart: 'monday', lastExport: null }, d.settings || {});
-      saveRcp(); savePlan(); saveChecks(); saveSettings();
+      saveRcp(); savePlan(); saveChecks(); saveExtras(); saveSettings();
       planWS = null; shopWS = null;
       closeModal();
       render();
@@ -903,7 +976,7 @@ function importData(ev) {
 function wipeAll() {
   if (!confirm('レシピ・材料・予定をすべて削除します。よろしいですか？')) return;
   if (!confirm('本当に削除しますか？（元に戻せません）')) return;
-  ['kondate_ingredients','kondate_recipes','kondate_mealPlan','kondate_shoppingChecks','kondate_settings'].forEach(k => localStorage.removeItem(k));
+  ['kondate_ingredients','kondate_recipes','kondate_mealPlan','kondate_shoppingChecks','kondate_shoppingExtras','kondate_settings'].forEach(k => localStorage.removeItem(k));
   location.reload();
 }
 
