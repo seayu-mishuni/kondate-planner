@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="こんだて">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FFF6E9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1B1815" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
 <title>献立プランナー</title>
@@ -251,7 +254,7 @@ let extras = store.get('kondate_shoppingExtras', {});
 let settings = Object.assign({ slots: ['dinner'], weekStart: 'monday', lastExport: null }, store.get('kondate_settings', {}));
 
 function saveRcp() { store.set('kondate_recipes', recipes); }
-function savePlan() { store.set('kondate_mealPlan', mealPlan); }
+function savePlan() { lastCookedCache = null; store.set('kondate_mealPlan', mealPlan); }
 function saveChecks() { store.set('kondate_shoppingChecks', checks); }
 function saveExtras() { store.set('kondate_shoppingExtras', extras); }
 function saveSettings() { store.set('kondate_settings', settings); }
@@ -288,17 +291,24 @@ function weekStartOf(ds) {
   return addDays(ds, -offset);
 }
 function diffDays(a, b) { return Math.round((toDate(b) - toDate(a)) / 86400000); }
-function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function activeSlots() { return SLOTDEFS.map(s => s[0]).filter(k => settings.slots.includes(k)); }
 
-/* ---------- 日本の祝日（オフライン計算・1980〜2099年対応） ---------- */
+/* ----------
+   日本の祝日（オフライン計算）
+   現行の祝日法にもとづき、振替休日・国民の休日まで算出する。
+   過去の法改正（成人の日の移動祝日化、天皇誕生日の変更、山の日の新設、五輪年の特例など）は
+   反映していないので、昔の年を表示すると実際とずれる。献立の用途では影響しない。
+   ---------- */
 function nthMondayOfMonth(year, month, n) {
   const d = new Date(year, month - 1, 1);
   let count = 0;
-  while (true) {
+  // 月をまたいだら打ち切る（n が大きすぎても無限ループにしない）
+  while (d.getMonth() === month - 1) {
     if (d.getDay() === 1) { count++; if (count === n) return d.getDate(); }
     d.setDate(d.getDate() + 1);
   }
+  return null;
 }
 function springEquinoxDay(year) { return Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4)); }
 function autumnEquinoxDay(year) { return Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4)); }
@@ -351,23 +361,29 @@ function recipeById(id) { return recipes.find(r => r.id === id); }
 function recipeName(id) { const r = recipeById(id); return r ? r.name : '（削除済み）'; }
 function ingredientNames() {
   const set = new Set();
-  recipes.forEach(r => (r.ingredients || []).forEach(l => { if (l.name) set.add(l.name); }));
+  // 削除済み（アーカイブ）レシピの材料はサジェストに出さない
+  recipes.filter(r => !r.archived).forEach(r => (r.ingredients || []).forEach(l => { if (l.name) set.add(l.name); }));
   return [...set].sort((a, b) => a.localeCompare(b, 'ja'));
 }
 function planOf(ds, slot) { return (mealPlan[ds] && mealPlan[ds][slot]) || []; }
 
-function lastCooked(recipeId) {
+// レシピ一覧で全件ぶん呼ぶため、予定を1回だけ走査して結果を使い回す
+let lastCookedCache = null;
+function lastCookedMap() {
+  if (lastCookedCache) return lastCookedCache;
   const t = todayStr();
-  let best = null;
+  const map = {};
   for (const ds in mealPlan) {
     if (ds > t) continue;
     const day = mealPlan[ds];
     for (const slot in day) {
-      if (day[slot].includes(recipeId) && (!best || ds > best)) best = ds;
+      day[slot].forEach(id => { if (!map[id] || ds > map[id]) map[id] = ds; });
     }
   }
-  return best;
+  lastCookedCache = map;
+  return map;
 }
+function lastCooked(recipeId) { return lastCookedMap()[recipeId] || null; }
 function lastCookedLabel(recipeId) {
   const d = lastCooked(recipeId);
   if (!d) return 'まだ作ってない';
@@ -390,6 +406,7 @@ function switchTab(t) {
 }
 function render() {
   closeSheet();
+  lastCookedCache = null;
   if (activeTab === 'today') renderToday();
   else if (activeTab === 'plan') renderPlan();
   else if (activeTab === 'recipes') renderRecipes();
@@ -551,6 +568,20 @@ function movePlanWeek(n) { planWS = addDays(planWS, n * 7); renderPlan(); }
 function goShoppingWeek() { shopWS = planWS; switchTab('shopping'); }
 
 function copyLastWeek() {
+  // 先に「コピー元が何件あるか」「今週に何件入っているか」を数えてから確認する
+  let srcCount = 0, dstCount = 0;
+  for (let i = 0; i < 7; i++) {
+    const dst = addDays(planWS, i), src = addDays(planWS, i - 7);
+    activeSlots().forEach(slot => {
+      srcCount += planOf(src, slot).filter(id => recipeById(id) && !recipeById(id).archived).length;
+      dstCount += planOf(dst, slot).length;
+    });
+  }
+  if (srcCount === 0) { alert('先週の献立が登録されていません'); return; }
+  const msg = dstCount > 0
+    ? 'この週にはすでに' + dstCount + '件の献立が入っています。\n先週の' + srcCount + '件を追加しますか？（今ある献立は残ります）'
+    : '先週の' + srcCount + '件をこの週にコピーしますか？';
+  if (!confirm(msg)) return;
   let copied = 0;
   for (let i = 0; i < 7; i++) {
     const dst = addDays(planWS, i), src = addDays(planWS, i - 7);
@@ -565,7 +596,7 @@ function copyLastWeek() {
   }
   savePlan();
   renderPlan();
-  if (copied === 0) alert('先週の献立が見つかりませんでした');
+  if (copied === 0) alert('先週の献立はすべてこの週に入っているため、追加はありませんでした');
 }
 
 function removeFromPlan(ds, slot, idx) {
@@ -768,6 +799,8 @@ function deleteRecipe() {
 
 /* ---------- 買い物リスト ---------- */
 let shopWS = null, shopItems = [];
+// 再描画で入力途中の内容が消えないよう、手動追加の下書きを保持する
+let extraDraft = { name: '', qty: '' };
 function parseQty(q) {
   if (!q) return null;
   const frac = q.match(/^(\d+)\/(\d+)$/);
@@ -782,79 +815,121 @@ function fmtQty(n) {
   if (Math.abs(r - 0.75) < 0.001) return '3/4';
   return String(r);
 }
+// 同じ材料は1行にまとめ、単位が違う分は数量を併記する（買い物中に同じ品を2回探さないように）
 function buildShopping(ws) {
-  const map = new Map();
+  const byName = new Map();
   const weekRecipes = [];
+  const seen = new Set();
   for (let i = 0; i < 7; i++) {
     const ds = addDays(ws, i);
     activeSlots().forEach(slot => planOf(ds, slot).forEach(id => {
       const r = recipeById(id);
       if (!r) return;
-      if (!weekRecipes.includes(r.name)) weekRecipes.push(r.name);
+      if (!seen.has(r.id)) {
+        seen.add(r.id);
+        weekRecipes.push({ id: r.id, name: r.name, ingCount: (r.ingredients || []).filter(l => lineName(l)).length });
+      }
       (r.ingredients || []).forEach(l => {
         const nm = lineName(l);
         if (!nm) return;
         const unit = l.unit || '';
-        const key = nm + '|' + unit;
-        if (!map.has(key)) map.set(key, { key, name: nm, unit, sum: 0, vague: 0 });
-        const e = map.get(key);
+        if (!byName.has(nm)) byName.set(nm, { key: 'ing:' + nm, name: nm, units: new Map() });
+        const g = byName.get(nm);
+        if (!g.units.has(unit)) g.units.set(unit, { unit, sum: 0, vague: 0 });
+        const u = g.units.get(unit);
         const n = parseQty(l.qty);
-        if (n === null) e.vague++; else e.sum += n;
+        if (n === null) u.vague++; else u.sum += n;
       });
     }));
   }
-  const items = [...map.values()];
-  items.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-  return { items, weekRecipes };
+  const groups = [...byName.values()].map(g => ({
+    key: g.key, name: g.name,
+    parts: [...g.units.values()].sort((a, b) => (a.unit ? 0 : 1) - (b.unit ? 0 : 1))
+  }));
+  groups.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  return { groups, weekRecipes };
 }
-function qtyLabel(e) {
-  const parts = [];
-  if (e.sum > 0) parts.push(fmtQty(e.sum) + e.unit);
-  if (e.vague > 0) parts.push(e.sum > 0 ? '＋適量' : '適量');
-  return parts.join(' ');
+function qtyLabel(g) {
+  const sums = g.parts.filter(p => p.sum > 0).map(p => fmtQty(p.sum) + p.unit);
+  const vague = g.parts.some(p => p.vague > 0);
+  if (sums.length === 0) return vague ? '適量' : '';
+  return sums.join(' ＋ ') + (vague ? ' ＋適量' : '');
 }
 function extrasOf(ws) { return extras[ws] || []; }
+// 献立を変えて使わなくなった材料のチェックを残さない
+function pruneChecks(ws, groups, extraList) {
+  const ck = checks[ws];
+  if (!ck) return;
+  const valid = new Set(groups.map(g => g.key).concat(extraList.map(e => 'extra:' + e.id)));
+  let changed = false;
+  Object.keys(ck).forEach(k => { if (!valid.has(k)) { delete ck[k]; changed = true; } });
+  if (changed) {
+    if (Object.keys(ck).length === 0) delete checks[ws];
+    saveChecks();
+  }
+}
+
+function checkRowHtml(key, done, name, qty, delId) {
+  return '<div class="check' + (done ? ' done' : '') + '" role="checkbox" tabindex="0" aria-checked="' + (done ? 'true' : 'false') +
+    '" onclick="' + (delId ? 'toggleExtraCheck(\'' + delId + '\')' : 'toggleCheck(\'' + esc(key) + '\')') + '">' +
+    '<span class="cbox">' + (done ? '✓' : '') + '</span>' +
+    '<span class="nm">' + esc(name) + '</span>' +
+    '<span class="qty">' + esc(qty) + '</span>' +
+    (delId ? '<button class="delrow" onclick="event.stopPropagation(); deleteExtraItem(\'' + delId + '\')" aria-label="削除">✕</button>' : '') +
+    '</div>';
+}
+
 function renderShopping() {
   if (!shopWS) shopWS = weekStartOf(todayStr());
   const end = addDays(shopWS, 6);
-  const { items, weekRecipes } = buildShopping(shopWS);
+  const { groups, weekRecipes } = buildShopping(shopWS);
   const extraList = extrasOf(shopWS);
-  shopItems = items;
+  shopItems = groups;
+  pruneChecks(shopWS, groups, extraList);
   const ck = checks[shopWS] || {};
+  const noPlan = weekRecipes.length === 0;
+  const noIng = weekRecipes.filter(r => r.ingCount === 0);
   let h = '<div class="weeknav"><button class="navbtn" onclick="moveShopWeek(-1)">◀</button><b>' + mdLabel(shopWS) + ' 〜 ' + mdLabel(end) + ' の買い物</b><button class="navbtn" onclick="moveShopWeek(1)">▶</button></div>';
-  if (items.length === 0 && extraList.length === 0) {
+  if (noPlan && extraList.length === 0) {
     h += '<div class="empty"><span class="big">🛒</span>この週の献立がまだありません<br>プランで献立を決めると自動で材料が集まります</div>';
     h += '<button class="btn wide" onclick="planWS=shopWS; switchTab(\'plan\')">🗓 この週のプランを立てる</button>';
   } else {
-    const doneCount = items.filter(e => ck[e.key]).length + extraList.filter(e => ck['extra:' + e.id]).length;
-    h += '<div class="card"><div class="row" style="margin-bottom:4px;"><span class="muted grow">📖 ' + weekRecipes.slice(0, 6).map(esc).join('・') + (weekRecipes.length > 6 ? ' ほか' : '') + '</span></div>';
-    h += '<div class="muted">' + doneCount + ' / ' + (items.length + extraList.length) + ' 個 チェック済み</div></div>';
-    if (items.length > 0) {
-      h += '<div class="card">';
-      items.forEach((e, i) => {
-        const done = !!ck[e.key];
-        h += '<div class="check' + (done ? ' done' : '') + '" onclick="toggleCheck(' + i + ')"><span class="cbox">' + (done ? '✓' : '') + '</span><span class="nm">' + esc(e.name) + '</span><span class="qty">' + esc(qtyLabel(e)) + '</span></div>';
+    if (!noPlan) {
+      const doneCount = groups.filter(g => ck[g.key]).length + extraList.filter(e => ck['extra:' + e.id]).length;
+      h += '<div class="card"><div class="row" style="margin-bottom:4px;"><span class="muted grow">📖 ' + weekRecipes.slice(0, 6).map(r => esc(r.name)).join('・') + (weekRecipes.length > 6 ? ' ほか' : '') + '</span></div>';
+      h += '<div class="muted">' + doneCount + ' / ' + (groups.length + extraList.length) + ' 個 チェック済み</div></div>';
+    }
+    // 献立は入っているのに材料が未登録、というケースを「献立なし」と混同させない
+    if (noIng.length > 0) {
+      h += '<div class="card"><div class="muted" style="margin-bottom:8px;">🍳 材料が未登録のレシピがあります。材料を追加すると買い物リストに並びます。</div>';
+      noIng.forEach(r => {
+        h += '<button class="btn ghost wide" style="margin-bottom:8px;" onclick="openRecipeModal(\'' + r.id + '\')">✏️ ' + esc(r.name) + ' に材料を追加</button>';
       });
+      h += '</div>';
+    }
+    if (groups.length > 0) {
+      h += '<div class="card">';
+      groups.forEach(g => { h += checkRowHtml(g.key, !!ck[g.key], g.name, qtyLabel(g), null); });
       h += '</div>';
     }
   }
   h += '<div class="sec-title">🧺 手動で追加</div><div class="card">';
   extraList.forEach(e => {
-    const done = !!ck['extra:' + e.id];
-    h += '<div class="check' + (done ? ' done' : '') + '"><span class="cbox" onclick="toggleExtraCheck(\'' + e.id + '\')">' + (done ? '✓' : '') + '</span><span class="nm" onclick="toggleExtraCheck(\'' + e.id + '\')">' + esc(e.name) + '</span><span class="qty">' + esc(e.qty || '') + '</span><button class="delrow" onclick="deleteExtraItem(\'' + e.id + '\')">✕</button></div>';
+    h += checkRowHtml('extra:' + e.id, !!ck['extra:' + e.id], e.name, e.qty || '', e.id);
   });
-  h += '<div class="row" style="margin-top:' + (extraList.length ? '10px' : '0') + ';"><input id="extra-item" type="text" placeholder="品名（例：ラップ）" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:2;" onkeydown="if(event.key===\'Enter\')addExtraItem()"><input id="extra-qty" type="text" placeholder="数量" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1;" onkeydown="if(event.key===\'Enter\')addExtraItem()"></div>';
+  h += '<div class="row" style="margin-top:' + (extraList.length ? '10px' : '0') + ';">' +
+    '<input id="extra-item" type="text" placeholder="品名（例：ラップ）" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:2;" value="' + esc(extraDraft.name) + '" oninput="extraDraft.name=this.value" onkeydown="if(event.key===\'Enter\')addExtraItem()">' +
+    '<input id="extra-qty" type="text" placeholder="数量" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1;" value="' + esc(extraDraft.qty) + '" oninput="extraDraft.qty=this.value" onkeydown="if(event.key===\'Enter\')addExtraItem()"></div>';
   h += '<button class="btn ghost wide" style="margin-top:8px;" onclick="addExtraItem()">＋ 追加</button>';
   h += '</div>';
-  if (items.length > 0 || extraList.length > 0) h += '<button class="btn ghost wide" onclick="copyShopping()">📋 リストをテキストでコピー</button>';
+  if (groups.length > 0 || extraList.length > 0) h += '<button class="btn ghost wide" onclick="copyShopping()">📋 リストをテキストでコピー</button>';
   document.getElementById('view').innerHTML = h;
 }
 function moveShopWeek(n) { shopWS = addDays(shopWS, n * 7); renderShopping(); }
-function toggleCheck(i) {
-  const e = shopItems[i];
+function toggleCheck(key) {
   if (!checks[shopWS]) checks[shopWS] = {};
-  if (checks[shopWS][e.key]) delete checks[shopWS][e.key];
-  else checks[shopWS][e.key] = true;
+  if (checks[shopWS][key]) delete checks[shopWS][key];
+  else checks[shopWS][key] = true;
   saveChecks();
   renderShopping();
 }
@@ -874,7 +949,10 @@ function addExtraItem() {
   if (!extras[shopWS]) extras[shopWS] = [];
   extras[shopWS].push({ id: 'ex-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name, qty: qtyEl.value.trim() });
   saveExtras();
+  extraDraft = { name: '', qty: '' };
   renderShopping();
+  const el = document.getElementById('extra-item');
+  if (el) el.focus();
 }
 function deleteExtraItem(id) {
   if (!extras[shopWS]) return;
@@ -921,17 +999,69 @@ function openSettings() {
     h += '<label class="row" style="padding:8px 0; cursor:pointer;"><input type="checkbox" style="width:22px; height:22px; accent-color:var(--coral);" ' + (settings.slots.includes(k) ? 'checked' : '') + ' onchange="toggleSlot(\'' + k + '\', this)"><span>' + label + '</span></label>';
   });
   h += '</div>';
-  h += '<div class="sec-title">週の開始曜日</div><div class="card"><select onchange="settings.weekStart=this.value; saveSettings(); planWS=null; shopWS=null;"><option value="monday"' + (settings.weekStart === 'monday' ? ' selected' : '') + '>月曜日</option><option value="sunday"' + (settings.weekStart === 'sunday' ? ' selected' : '') + '>日曜日</option></select></div>';
+  h += '<div class="sec-title">週の開始曜日</div><div class="card"><select onchange="setWeekStart(this.value)"><option value="monday"' + (settings.weekStart === 'monday' ? ' selected' : '') + '>月曜日</option><option value="sunday"' + (settings.weekStart === 'sunday' ? ' selected' : '') + '>日曜日</option></select></div>';
   h += '<div class="sec-title">バックアップ</div><div class="card">';
   h += '<div class="muted" style="margin-bottom:10px;">データはこの端末のブラウザ内のみに保存されます。定期的なエクスポートと、別端末への引き継ぎ（AirDrop等）にお使いください。' + (settings.lastExport ? '<br>最終エクスポート: ' + settings.lastExport : '') + '</div>';
   h += '<button class="btn wide" style="margin-bottom:8px;" onclick="exportData()">📤 エクスポート（JSON保存）</button>';
   h += '<button class="btn wide ghost" onclick="document.getElementById(\'import-file\').click()">📥 インポート（JSON読込）</button></div>';
+  const arch = archivedRecipes();
+  if (arch.length > 0) {
+    h += '<div class="sec-title">削除したレシピ（' + arch.length + '件）</div><div class="card">';
+    h += '<div class="muted" style="margin-bottom:8px;">過去の献立予定で名前を表示するために残してあります。</div>';
+    arch.forEach(r => {
+      h += '<div class="row" style="padding:8px 0; border-bottom:1.5px solid var(--line);"><span class="grow">' + esc(r.name) + '</span>' +
+        '<button class="btn sm ghost" onclick="restoreRecipe(\'' + r.id + '\')">戻す</button>' +
+        '<button class="btn sm danger" onclick="purgeRecipe(\'' + r.id + '\')">完全に削除</button></div>';
+    });
+    h += '</div>';
+  }
   h += '<div class="sec-title">データ</div><div class="card"><button class="btn wide danger" onclick="wipeAll()">全データを削除</button></div>';
   h += '<div class="muted" style="text-align:center; margin-top:14px;">献立プランナー v1.0</div></div>';
   const modal = document.getElementById('modal');
   modal.innerHTML = h;
   modal.classList.add('show');
 }
+function setWeekStart(v) {
+  settings.weekStart = v;
+  saveSettings();
+  // カレンダー・プラン・買物すべての週基準を作り直す（週表示だけ古い開始曜日で残らないように）
+  calWS = null; planWS = null; shopWS = null;
+  render();
+}
+
+function archivedRecipes() { return recipes.filter(r => r.archived); }
+
+function restoreRecipe(id) {
+  const r = recipeById(id);
+  if (!r) return;
+  r.archived = false;
+  r.updatedAt = todayStr();
+  saveRcp();
+  render();
+  openSettings();
+}
+
+function purgeRecipe(id) {
+  const r = recipeById(id);
+  if (!r) return;
+  let refs = 0;
+  Object.keys(mealPlan).forEach(ds => Object.keys(mealPlan[ds]).forEach(slot => {
+    refs += mealPlan[ds][slot].filter(x => x === id).length;
+  }));
+  if (!confirm('「' + r.name + '」を完全に削除しますか？' + (refs ? '\n過去の献立予定' + refs + '件からも消えます。' : '') + '\n元に戻せません。')) return;
+  recipes = recipes.filter(x => x.id !== id);
+  Object.keys(mealPlan).forEach(ds => {
+    Object.keys(mealPlan[ds]).forEach(slot => {
+      mealPlan[ds][slot] = mealPlan[ds][slot].filter(x => x !== id);
+      if (mealPlan[ds][slot].length === 0) delete mealPlan[ds][slot];
+    });
+    if (Object.keys(mealPlan[ds]).length === 0) delete mealPlan[ds];
+  });
+  saveRcp(); savePlan();
+  render();
+  openSettings();
+}
+
 function toggleSlot(k, cb) {
   let s = settings.slots.filter(x => x !== k);
   if (cb.checked) s.push(k);
@@ -944,15 +1074,27 @@ function exportData() {
     app: 'kondate-planner', schemaVersion: 2, exportedAt: new Date().toISOString(),
     recipes, mealPlan, shoppingChecks: checks, shoppingExtras: extras, settings
   };
-  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'kondate-backup-' + todayStr() + '.json';
-  a.click();
+  let url = null;
+  try {
+    const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+    url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kondate-backup-' + todayStr() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    alert('エクスポートに失敗しました: ' + e.message);
+    return;   // 失敗したときは「バックアップ済み」にしない
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+  }
   settings.lastExport = todayStr();
   saveSettings();
   openSettings();
 }
+let pendingImport = null;
 function importData(ev) {
   const file = ev.target.files[0];
   ev.target.value = '';
@@ -962,24 +1104,101 @@ function importData(ev) {
     try {
       const d = JSON.parse(reader.result);
       if (d.app !== 'kondate-planner') { alert('このアプリのバックアップファイルではありません'); return; }
-      if (!confirm('現在のデータをインポート内容で上書きします。よろしいですか？')) return;
-      recipes = d.recipes || [];
-      inlineIngredientRefs(recipes, d.ingredients);
-      mealPlan = d.mealPlan || {};
-      checks = d.shoppingChecks || {};
-      extras = d.shoppingExtras || {};
-      settings = Object.assign({ slots: ['dinner'], weekStart: 'monday', lastExport: null }, d.settings || {});
-      saveRcp(); savePlan(); saveChecks(); saveExtras(); saveSettings();
-      planWS = null; shopWS = null;
-      closeModal();
-      render();
-      alert('インポートしました');
+      if (d.schemaVersion > 2) {
+        if (!confirm('新しい形式のバックアップです（v' + d.schemaVersion + '）。\n一部を読み込めない可能性がありますが、続けますか？')) return;
+      }
+      pendingImport = d;
+      closeModal();   // 設定モーダルより下に隠れてしまうので先に閉じる
+      openImportSheet();
     } catch (e) { alert('読み込みに失敗しました: ' + e.message); }
   };
   reader.readAsText(file);
 }
+
+// 「追加（マージ）」と「置き換え」を選べるようにする。
+// Macでレシピだけ足したバックアップを取り込んで、iPhone側の献立予定を消してしまわないため。
+function openImportSheet() {
+  const d = pendingImport;
+  const rcpN = (d.recipes || []).length;
+  const planN = Object.keys(d.mealPlan || {}).length;
+  const exN = Object.values(d.shoppingExtras || {}).reduce((s, a) => s + a.length, 0);
+  let h = '<div class="grabber"></div><h3>バックアップの取り込み方</h3>';
+  h += '<div class="muted" style="margin:-6px 0 14px;">ファイルの内容: レシピ' + rcpN + '件 ・ 献立予定' + planN + '日分 ・ 手動追加' + exN + '件' +
+    (d.exportedAt ? '<br>作成日: ' + esc(String(d.exportedAt).slice(0, 10)) : '') + '</div>';
+  h += '<button class="btn wide" style="margin-bottom:6px;" onclick="applyImport(\'merge\')">➕ 今のデータに追加する</button>';
+  h += '<div class="muted" style="margin-bottom:14px;">今ある献立予定・買い物リストは残したまま、ファイル側の新しいレシピや予定を足します（おすすめ）</div>';
+  h += '<button class="btn wide ghost" style="margin-bottom:6px;" onclick="applyImport(\'replace\')">🔄 今のデータを置き換える</button>';
+  h += '<div class="muted" style="margin-bottom:14px;">この端末のレシピ・献立予定・買い物リストをすべて捨てて、ファイルの内容にします</div>';
+  h += '<button class="btn wide ghost" onclick="pendingImport=null; closeSheet()">やめる</button>';
+  openSheet(h);
+}
+
+function applyImport(mode) {
+  const d = pendingImport;
+  if (!d) return;
+  const inRecipes = (d.recipes || []).slice();
+  inlineIngredientRefs(inRecipes, d.ingredients);
+  const summary = [];
+  if (mode === 'replace') {
+    if (!confirm('この端末のデータをすべて捨てて、ファイルの内容に置き換えます。元に戻せません。よろしいですか？')) return;
+    recipes = inRecipes;
+    mealPlan = d.mealPlan || {};
+    checks = d.shoppingChecks || {};
+    extras = d.shoppingExtras || {};
+    settings = Object.assign({ slots: ['dinner'], weekStart: 'monday', lastExport: null }, d.settings || {});
+    summary.push('置き換えました（レシピ' + recipes.length + '件）');
+  } else {
+    // レシピ: 同じ id、または同じ名前がすでにあるものは追加しない
+    const ids = new Set(recipes.map(r => r.id));
+    const names = new Set(recipes.filter(r => !r.archived).map(r => r.name));
+    let addedRcp = 0;
+    inRecipes.forEach(r => {
+      if (ids.has(r.id) || names.has(r.name)) return;
+      ids.add(r.id); names.add(r.name);
+      recipes.push(r);
+      addedRcp++;
+    });
+    // 献立予定: 日付・食事ごとに、まだ入っていないレシピだけ足す
+    let addedPlan = 0;
+    Object.keys(d.mealPlan || {}).forEach(ds => {
+      Object.keys(d.mealPlan[ds]).forEach(slot => {
+        (d.mealPlan[ds][slot] || []).forEach(id => {
+          if (!mealPlan[ds]) mealPlan[ds] = {};
+          if (!mealPlan[ds][slot]) mealPlan[ds][slot] = [];
+          if (!mealPlan[ds][slot].includes(id)) { mealPlan[ds][slot].push(id); addedPlan++; }
+        });
+      });
+    });
+    // 買い物リストのチェック: 週ごとに合わせる
+    Object.keys(d.shoppingChecks || {}).forEach(ws => {
+      checks[ws] = Object.assign({}, checks[ws] || {}, d.shoppingChecks[ws]);
+    });
+    // 手動追加: 同じ id は足さない
+    let addedEx = 0;
+    Object.keys(d.shoppingExtras || {}).forEach(ws => {
+      if (!extras[ws]) extras[ws] = [];
+      const exIds = new Set(extras[ws].map(e => e.id));
+      (d.shoppingExtras[ws] || []).forEach(e => {
+        if (exIds.has(e.id)) return;
+        exIds.add(e.id);
+        extras[ws].push(e);
+        addedEx++;
+      });
+    });
+    // 設定（食事スロット・週開始曜日）はこの端末のものを維持する
+    summary.push('レシピ' + addedRcp + '件・献立' + addedPlan + '件・手動追加' + addedEx + '件を追加しました');
+    if (addedRcp === 0 && addedPlan === 0 && addedEx === 0) summary.push('（新しく追加するものはありませんでした）');
+  }
+  saveRcp(); savePlan(); saveChecks(); saveExtras(); saveSettings();
+  pendingImport = null;
+  calWS = null; planWS = null; shopWS = null;
+  closeSheet();
+  closeModal();
+  render();
+  alert(summary.join('\n'));
+}
 function wipeAll() {
-  if (!confirm('レシピ・材料・予定をすべて削除します。よろしいですか？')) return;
+  if (!confirm('レシピ・献立予定・買い物リストのチェック・手動で追加した品・設定を、すべて削除します。よろしいですか？')) return;
   if (!confirm('本当に削除しますか？（元に戻せません）')) return;
   ['kondate_ingredients','kondate_recipes','kondate_mealPlan','kondate_shoppingChecks','kondate_shoppingExtras','kondate_settings'].forEach(k => localStorage.removeItem(k));
   location.reload();
@@ -996,9 +1215,45 @@ function closeSheet() {
   document.getElementById('overlay').classList.remove('show');
 }
 function closeModal() {
-  document.getElementById('modal').classList.remove('show');
-  document.getElementById('modal').innerHTML = '';
+  const m = document.getElementById('modal');
+  const wasOpen = m.classList.contains('show');
+  m.classList.remove('show');
+  m.innerHTML = '';
+  // 設定（食事スロット・週開始曜日）の変更を、閉じた時点で画面に反映する
+  if (wasOpen) render();
 }
+
+/* ---------- キーボード操作（Mac ブラウザ用） ---------- */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('modal').classList.contains('show')) { closeModal(); return; }
+    if (document.getElementById('sheet').classList.contains('show')) { pendingImport = null; closeSheet(); }
+    return;
+  }
+  if (e.key === 'Enter' || e.key === ' ') {
+    const el = document.activeElement;
+    if (el && el.getAttribute && el.getAttribute('role') === 'checkbox') { e.preventDefault(); el.click(); }
+  }
+});
+
+/* ---------- 日付が変わったときの再描画 ---------- */
+// ホーム画面に置いたまま日をまたぐと「今日のごはん」が前日のままになるため、復帰時に作り直す
+let lastKnownDay = todayStr();
+function handleDayChange() {
+  const t = todayStr();
+  if (t === lastKnownDay) return;
+  const prev = lastKnownDay;
+  lastKnownDay = t;
+  if (calWS === weekStartOf(prev)) calWS = weekStartOf(t);
+  if (planWS === weekStartOf(prev)) planWS = weekStartOf(t);
+  if (shopWS === weekStartOf(prev)) shopWS = weekStartOf(t);
+  if (calCur === prev.slice(0, 7)) calCur = t.slice(0, 7);
+  render();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') handleDayChange();
+});
+window.addEventListener('focus', handleDayChange);
 
 (function() {
   let sx = 0, sy = 0, tracking = false;
@@ -1021,6 +1276,13 @@ function closeModal() {
 })();
 
 switchTab('today');
+
+// オフライン起動用。file:// では Service Worker が使えないので http(s) のときだけ登録する
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
