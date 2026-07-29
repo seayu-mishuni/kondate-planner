@@ -526,7 +526,7 @@ function openDaySheet(ds) {
     const ids = planOf(ds, slot);
     h += '<div style="margin-bottom:12px;"><div class="muted" style="font-weight:600; margin-bottom:4px;">' + SLOTNAME[slot] + '</div>';
     if (ids.length === 0) h += '<span class="muted">未定</span>';
-    else ids.forEach(id => { h += '<span class="chip">' + esc(recipeName(id)) + '</span>'; });
+    else ids.forEach((id, idx) => { h += '<span class="chip" onclick="chipMenu(\'' + ds + '\',\'' + slot + '\',' + idx + ')">' + esc(recipeName(id)) + '</span>'; });
     h += '</div>';
   });
   h += '<button class="btn wide" onclick="planWS = weekStartOf(\'' + ds + '\'); switchTab(\'plan\')">🗓 この週のプランで編集</button>';
@@ -616,6 +616,7 @@ function chipMenu(ds, slot, idx) {
   if (r) {
     const ings = (r.ingredients || []).map(l => esc(lineName(l))).join('・');
     if (ings) h += '<div class="muted" style="margin-bottom:12px;">材料: ' + ings + '</div>';
+    if (r.memo) h += '<div class="card" style="margin-bottom:12px; white-space:pre-wrap;">📝 ' + esc(r.memo) + '</div>';
   }
   h += '<button class="btn wide ghost" style="margin-bottom:8px;" onclick="openMoveSheet(\'' + ds + '\',\'' + slot + '\',' + idx + ', false)">📆 別の日へ移動</button>';
   h += '<button class="btn wide ghost" style="margin-bottom:8px;" onclick="openMoveSheet(\'' + ds + '\',\'' + slot + '\',' + idx + ', true)">📄 別の日へコピー</button>';
