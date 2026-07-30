@@ -618,9 +618,6 @@ function chipMenu(ds, slot, idx) {
     if (ings) h += '<div class="muted" style="margin-bottom:12px;">材料: ' + ings + '</div>';
     if (r.memo) h += '<div class="card" style="margin-bottom:12px; white-space:pre-wrap;">📝 ' + esc(r.memo) + '</div>';
   }
-  h += '<button class="btn wide ghost" style="margin-bottom:8px;" onclick="openMoveSheet(\'' + ds + '\',\'' + slot + '\',' + idx + ', false)">📆 別の日へ移動</button>';
-  h += '<button class="btn wide ghost" style="margin-bottom:8px;" onclick="openMoveSheet(\'' + ds + '\',\'' + slot + '\',' + idx + ', true)">📄 別の日へコピー</button>';
-  if (r && !r.archived) h += '<button class="btn wide ghost" style="margin-bottom:8px;" onclick="closeSheet(); openRecipeModal(\'' + id + '\')">✏️ レシピを見る・編集</button>';
   h += '<button class="btn wide danger" onclick="removeFromPlan(\'' + ds + '\',\'' + slot + '\',' + idx + ')">この日から外す</button>';
   openSheet(h);
 }
