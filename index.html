@@ -683,7 +683,7 @@ function renderPickerList(q) {
   if (list.length === 0) h = '<div class="empty">レシピがありません</div>';
   else {
     if (!q) h += '<div class="muted" style="margin-bottom:4px;">最近作っていない順</div>';
-    list.slice(0, 30).forEach(x => {
+    list.forEach(x => {
       h += '<div class="listrow row" onclick="pickRecipe(\'' + x.r.id + '\')"><span class="grow"><b>' + esc(x.r.name) + '</b> <span class="badge ' + CATBADGE[x.r.category] + '">' + esc(x.r.category) + '</span></span><span class="muted">' + lastCookedLabel(x.r.id) + '</span></div>';
     });
   }
