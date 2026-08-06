@@ -752,6 +752,7 @@ function openRecipeModal(id, fromPicker) {
   const modal = document.getElementById('modal');
   modal.innerHTML = h;
   modal.classList.add('show');
+  modal.scrollTop = 0;
   refreshDatalist();
   const lines = r && r.ingredients && r.ingredients.length ? r.ingredients : [null, null];
   lines.forEach(l => addIngRow(l));
@@ -1035,6 +1036,7 @@ function openSettings() {
   const modal = document.getElementById('modal');
   modal.innerHTML = h;
   modal.classList.add('show');
+  modal.scrollTop = 0;
 }
 function setWeekStart(v) {
   settings.weekStart = v;
@@ -1221,8 +1223,10 @@ function wipeAll() {
 
 /* ---------- 共通 ---------- */
 function openSheet(html) {
-  document.getElementById('sheet').innerHTML = html;
-  document.getElementById('sheet').classList.add('show');
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = html;
+  sheet.classList.add('show');
+  sheet.scrollTop = 0;
   document.getElementById('overlay').classList.add('show');
 }
 function closeSheet() {
